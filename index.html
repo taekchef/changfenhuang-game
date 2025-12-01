@@ -6,7 +6,7 @@
     <title>掷圣杯 - 潮汕老爷保号 (AI版)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap'); /* Traditional Font */
+        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
         
         body {
             margin: 0;
@@ -326,7 +326,7 @@
 <script>
 /**
  * 掷圣杯 Game Logic
- * Pixel Art Style + Fixed Fortunes + Gemini AI Interpretation
+ * Pixel Art Style + Delta Time Physics
  */
 
 const canvas = document.getElementById('gameCanvas');
@@ -365,8 +365,8 @@ const STATE = {
 const COLORS = {
     bg: '#2C1E18',
     gold: '#FFD700',
-    red: '#D93829', // Deep Red for Yin/Round side
-    wood: '#E5C087', // Light Wood for Yang/Flat side
+    red: '#D93829', 
+    wood: '#E5C087',
     skin: '#E8B796',
     altar: '#8B4513',
     shadow: 'rgba(0,0,0,0.5)'
@@ -374,12 +374,12 @@ const COLORS = {
 
 // Physics Variables
 let gameState = STATE.START;
-let frames = 0;
+let animTime = 0; // Replaces 'frames' for animation timing
 let chargePower = 0;
 let chargeDir = 1;
-let resultType = ""; // "SHENGBEI", "XIAOBEI", "WENBEI"
+let resultType = ""; 
 
-// Physics
+// Physics Constants (Calibrated for 60FPS)
 const GRAVITY = 0.15; 
 const FLOOR_Y = 380; 
 
@@ -428,7 +428,6 @@ const WENBEI_MSGS = [
 ];
 
 // --- Gemini AI Logic ---
-
 async function callGemini(type) {
     fortuneModal.style.display = 'flex';
     loadingView.style.display = 'flex';
@@ -443,45 +442,27 @@ async function callGemini(type) {
     if (type === "SHENGBEI") {
         const randomIndex = Math.floor(Math.random() * FORTUNES.length);
         currentFortune = FORTUNES[randomIndex];
-        
         fortuneTitle.innerText = "✨ " + currentFortune.title + " ✨";
         fortuneText.innerText = currentFortune.poem;
-        
-        prompt = `You are 'Lao Ye' (老爷), a wise Chaoshan deity. A believer drew the fortune sign: "${currentFortune.title}" with the poem: "${currentFortune.poem.replace(/\n/g, ', ')}".
-        Please provide a brief, wise, and warm interpretation (解签) of this poem in Chinese. 
-        Focus on telling them what it implies for their future (career, health, or luck).
-        Keep it under 60 words. Tone: Ancient, protective, authentic.`;
-        
+        prompt = `You are 'Lao Ye' (老爷), a wise Chaoshan deity. A believer drew the fortune sign: "${currentFortune.title}" with the poem: "${currentFortune.poem.replace(/\n/g, ', ')}". Provide a brief, wise, warm interpretation (解签) in Chinese (<60 words). Tone: Ancient, protective.`;
     } else if (type === "XIAOBEI") {
         const randomIndex = Math.floor(Math.random() * XIAOBEI_MSGS.length);
         const msg = XIAOBEI_MSGS[randomIndex];
-        
         fortuneTitle.innerText = "☁️ 老爷笑了 ☁️";
         fortuneText.innerText = msg;
-        
-        prompt = `You are 'Lao Ye' (老爷). Believer threw a 'Xiaobei' (Laughing Cup). 
-        You gave them this message: "${msg}".
-        Briefly explain specifically why you said this in a humorous, kind, grandfatherly way. (Under 40 words Chinese).`;
-
+        prompt = `You are 'Lao Ye'. Believer threw 'Xiaobei'. You said: "${msg}". Briefly explain why in humorous/kind way (Chinese <40 words).`;
     } else {
-        // WENBEI
         const randomIndex = Math.floor(Math.random() * WENBEI_MSGS.length);
         const msg = WENBEI_MSGS[randomIndex];
-        
         fortuneTitle.innerText = "⛰️ 老爷不语 ⛰️";
         fortuneText.innerText = msg;
-        
-        prompt = `You are 'Lao Ye' (老爷). Believer threw a 'Wenbei' (Stable Cup/Refusal).
-        You gave them this warning: "${msg}".
-        Briefly explain specifically why you refused in a stern, authoritative way. (Under 40 words Chinese).`;
+        prompt = `You are 'Lao Ye'. Believer threw 'Wenbei'. You said: "${msg}". Briefly explain why in stern/authoritative way (Chinese <40 words).`;
     }
 
     try {
         if (!apiKey) {
-            // Even if no API key, we now have content for all 3 types to show!
             loadingView.style.display = 'none';
             resultView.style.display = 'block';
-            
             if (type === "SHENGBEI") {
                  fortuneAiComment.innerText = "(老爷正在闭关，暂无法解签，请自行感悟)";
                  fortuneAiComment.style.display = 'block';
@@ -492,21 +473,15 @@ async function callGemini(type) {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-            })
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
 
         const data = await response.json();
-        
         if (data.error) throw new Error(data.error.message);
         
         const text = data.candidates[0].content.parts[0].text;
-        
         loadingView.style.display = 'none';
         resultView.style.display = 'block';
-
-        // For all types, we now show the "AI Comment" section
         fortuneAiComment.innerText = "【老爷神示】\n" + text;
         fortuneAiComment.style.display = 'block';
 
@@ -514,8 +489,6 @@ async function callGemini(type) {
         console.error(error);
         loadingView.style.display = 'none';
         resultView.style.display = 'block';
-        
-        // Show the static content even if AI fails
         fortuneAiComment.innerText = "(老爷信号不佳，请以此签文/神谕为准)";
         fortuneAiComment.style.display = 'block';
     }
@@ -532,7 +505,6 @@ aiButton.addEventListener('click', (e) => {
 
 
 // --- Pixel Art Drawing ---
-
 function drawRect(x, y, w, h, color) {
     ctx.fillStyle = color;
     ctx.fillRect(Math.floor(x), Math.floor(y), w, h);
@@ -540,50 +512,23 @@ function drawRect(x, y, w, h, color) {
 
 // 12x12 Pixel Grid for Shengbei
 const SHENGBEI_PIXELS = {
-    // Top-down view of Flat Side (Yang) - Wood color
     flat: [
-        [0,0,0,1,1,1,1,1,0,0,0,0],
-        [0,0,1,1,1,2,2,2,1,0,0,0],
-        [0,1,1,1,2,2,2,2,1,1,0,0],
-        [1,1,1,1,2,2,2,2,1,1,1,0],
-        [1,1,1,1,1,1,1,1,1,1,1,0],
-        [1,1,1,1,0,0,0,0,1,1,1,0],
-        [1,1,1,0,0,0,0,0,0,1,1,0],
-        [1,1,0,0,0,0,0,0,0,1,1,0],
-        [1,0,0,0,0,0,0,0,0,0,1,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0]
+        [0,0,0,1,1,1,1,1,0,0,0,0], [0,0,1,1,1,2,2,2,1,0,0,0], [0,1,1,1,2,2,2,2,1,1,0,0],
+        [1,1,1,1,2,2,2,2,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,0], [1,1,1,1,0,0,0,0,1,1,1,0],
+        [1,1,1,0,0,0,0,0,0,1,1,0], [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]
     ],
-    // Top-down view of Round Side (Yin) - Red color
     round: [
-        [0,0,0,1,1,1,1,1,0,0,0,0],
-        [0,0,1,1,1,1,1,1,1,0,0,0],
-        [0,1,1,1,2,2,1,1,1,1,0,0],
-        [1,1,1,2,2,2,2,1,1,1,1,0],
-        [1,1,1,2,2,2,2,1,1,1,1,0],
-        [1,1,1,1,1,1,1,1,1,1,1,0],
-        [1,1,1,0,0,0,0,0,0,1,1,0],
-        [1,1,0,0,0,0,0,0,0,1,1,0],
-        [1,0,0,0,0,0,0,0,0,0,1,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0]
+        [0,0,0,1,1,1,1,1,0,0,0,0], [0,0,1,1,1,1,1,1,1,0,0,0], [0,1,1,1,2,2,1,1,1,1,0,0],
+        [1,1,1,2,2,2,2,1,1,1,1,0], [1,1,1,2,2,2,2,1,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,0],
+        [1,1,1,0,0,0,0,0,0,1,1,0], [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]
     ],
-    // Side view - Thin crescent profile
     side: [
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,1,1,1,1,1,1,1,1,1,0,0],
-        [1,1,1,1,1,1,1,1,1,1,1,0],
-        [1,1,0,0,0,0,0,0,0,1,1,0],
-        [1,0,0,0,0,0,0,0,0,0,1,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0]
+        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0], [0,1,1,1,1,1,1,1,1,1,0,0], [1,1,1,1,1,1,1,1,1,1,1,0],
+        [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0], [0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]
     ]
 };
 
@@ -591,10 +536,7 @@ function drawPixelSprite(x, y, grid, colorMap, scale = 2, rot = 0) {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rot);
-    
-    // Centering offset (6 * scale)
     const offset = 6 * scale;
-    
     for(let r=0; r<12; r++) {
         for(let c=0; c<12; c++) {
             const val = grid[r][c];
@@ -608,14 +550,13 @@ function drawPixelSprite(x, y, grid, colorMap, scale = 2, rot = 0) {
 }
 
 function drawLaoYe() {
-    const cx = GAME_WIDTH / 2; // 160
+    const cx = GAME_WIDTH / 2;
     const cy = 120;
-
     ctx.save();
     ctx.scale(2, 2);
 
     // Aura
-    ctx.globalAlpha = 0.2 + Math.sin(frames * 0.05) * 0.1;
+    ctx.globalAlpha = 0.2 + Math.sin(animTime * 0.05) * 0.1;
     ctx.beginPath();
     ctx.arc(cx, cy, 60, 0, Math.PI * 2);
     ctx.fillStyle = COLORS.gold;
@@ -627,44 +568,41 @@ function drawLaoYe() {
     drawRect(cx - 10, cy, 20, 80, COLORS.gold);
     drawRect(cx - 40, cy + 5, 10, 30, '#801A10');
     drawRect(cx + 30, cy + 5, 10, 30, '#801A10');
-
     // Head
     drawRect(cx - 15, cy - 35, 30, 35, '#E8C0A0');
     drawRect(cx - 15, cy - 35, 30, 10, 'black');
     drawRect(cx - 10, cy - 45, 20, 10, COLORS.gold);
-    
     // Beard
     drawRect(cx - 10, cy - 5, 20, 25, 'white');
     drawRect(cx - 5, cy + 20, 10, 15, '#ddd');
-
     // Eyes
     drawRect(cx - 8, cy - 20, 4, 2, 'black');
     drawRect(cx + 4, cy - 20, 4, 2, 'black');
-
     // Table
     drawRect(0, 250, GAME_WIDTH, 100, COLORS.altar);
-    
     // Incense
     drawRect(cx - 20, 240, 40, 20, '#CD7F32');
     drawRect(cx - 15, 235, 30, 5, '#A0522D');
-    
     drawRect(cx - 5, 215, 2, 20, '#D2691E');
     drawRect(cx, 210, 2, 25, '#D2691E');
     drawRect(cx + 5, 215, 2, 20, '#D2691E');
 
-    if (frames % 4 === 0) {
-        particles.push({
-            // Fix: Smoke needs to be scaled by 2 to match visual scaling of the canvas drawing logic
-            // cx is 160. Drawing in updateParticles is global.
-            // Center of screen is 320 (160*2).
-            x: (cx * 2) + (Math.random() - 0.5) * 10,
-            y: 420, 
-            vx: (Math.random() - 0.5) * 0.5,
-            vy: -0.5 - Math.random() * 0.5,
-            life: 80,
-            color: 'rgba(200,200,200,0.4)',
-            size: 4 
-        });
+    // Smoke (Time based spawn)
+    if (Math.floor(animTime) % 4 === 0) {
+        // Simple rate limiter to avoid excessive particles at high FPS
+        // Actually best to use a separate timer. 
+        // For simplicity, we just randomly add particles
+        if (Math.random() < 0.2) {
+             particles.push({
+                x: (cx * 2) + (Math.random() - 0.5) * 10,
+                y: 420, 
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: -0.5 - Math.random() * 0.5,
+                life: 80,
+                color: 'rgba(200,200,200,0.4)',
+                size: 4 
+            });
+        }
     }
 
     ctx.restore();
@@ -672,9 +610,9 @@ function drawLaoYe() {
 
 function drawHands() {
     let yOffset = 0;
-    if (gameState === STATE.CHARGING) yOffset = Math.sin(frames * 0.8) * 2 + chargePower * 0.5;
+    if (gameState === STATE.CHARGING) yOffset = Math.sin(animTime * 0.8) * 2 + chargePower * 0.5;
     else if (gameState === STATE.THROWN) yOffset = 300; 
-    else if (gameState === STATE.START) yOffset = Math.sin(frames * 0.05) * 3;
+    else if (gameState === STATE.START) yOffset = Math.sin(animTime * 0.05) * 3;
 
     const lx = 80;
     const rx = 240;
@@ -683,13 +621,11 @@ function drawHands() {
     ctx.save();
     ctx.scale(2, 2);
 
-    // Left Hand
+    // Hands
     drawRect(lx - 20, by, 40, 40, COLORS.skin);
     drawRect(lx - 15, by - 5, 10, 20, COLORS.skin);
     drawRect(lx - 5, by - 10, 10, 20, COLORS.skin);
     drawRect(lx + 5, by - 8, 10, 18, COLORS.skin);
-
-    // Right Hand
     drawRect(rx - 20, by, 40, 40, COLORS.skin);
     drawRect(rx + 5, by - 5, 10, 20, COLORS.skin);
     drawRect(rx - 5, by - 10, 10, 20, COLORS.skin);
@@ -708,38 +644,26 @@ function drawPixelShengbei(cup) {
     const scale = 3; 
     const rotation = cup.rot;
     
-    // Improved visual logic
-    // We want the visual sprite to strictly match the logical state if settled,
-    // or properly reflect the "face" in air using Cosine.
-    
     let showFlat = false;
-
-    // Use isFlat if the cup is settled on floor
     if (cup.y >= FLOOR_Y && Math.abs(cup.vy) < 0.1) {
         showFlat = cup.isFlat;
     } else {
-        // In air / bouncing: Calculate visual face
-        // Cosine > 0 is "Top" (Flat/Yang), < 0 is "Bottom" (Round/Yin)
         const phase = Math.cos(rotation);
         showFlat = phase > 0;
     }
 
-    // Determine Sprite based on "showFlat" (Visual Face)
     if (Math.abs(Math.cos(rotation)) > 0.5) { 
-        // Showing face (Top or Bottom)
         if (showFlat) {
             grid = SHENGBEI_PIXELS.flat;
-            colors = {1: COLORS.wood, 2: '#F4D090'}; // Wood
+            colors = {1: COLORS.wood, 2: '#F4D090'}; 
         } else {
             grid = SHENGBEI_PIXELS.round;
-            colors = {1: COLORS.red, 2: '#FF5544'}; // Red
+            colors = {1: COLORS.red, 2: '#FF5544'}; 
         }
     } else {
-        // Showing Side profile
         grid = SHENGBEI_PIXELS.side;
         colors = {1: COLORS.red};
     }
-
     drawPixelSprite(cup.x, cup.y, grid, colors, scale, rotation);
 }
 
@@ -769,7 +693,7 @@ function createExplosion(x, y, color) {
     }
 }
 
-// --- Game Logic ---
+// --- Game Logic (Physics) ---
 
 function resetGame() {
     gameState = STATE.START;
@@ -779,7 +703,6 @@ function resetGame() {
     aiLayer.style.display = 'none';
     resultType = "";
     currentFortune = null;
-    
     cups.left = { x: 80, y: FLOOR_Y, vx: 0, vy: 0, rot: 0, rotSpeed: 0, isFlat: false };
     cups.right = { x: 240, y: FLOOR_Y, vx: 0, vy: 0, rot: 0, rotSpeed: 0, isFlat: false };
 }
@@ -831,33 +754,36 @@ function checkResult() {
     }, 500);
 }
 
-function updatePhysics() {
+// dt = Time Scaling factor. 1.0 at 60Hz. 0.5 at 120Hz.
+function updatePhysics(dt) {
     if (gameState === STATE.THROWN || gameState === STATE.BOUNCING) {
         let settledCount = 0;
         [cups.left, cups.right].forEach((cup) => {
-            if (cup.y < FLOOR_Y) cup.vy += GRAVITY;
+            // Apply Gravity (Scaled by dt)
+            if (cup.y < FLOOR_Y) cup.vy += GRAVITY * dt;
             
-            cup.x += cup.vx;
-            cup.y += cup.vy;
-            cup.rot += cup.rotSpeed;
+            // Apply Velocity (Scaled by dt)
+            cup.x += cup.vx * dt;
+            cup.y += cup.vy * dt;
+            cup.rot += cup.rotSpeed * dt;
             
+            // Wall bounce
             if (cup.x < 30 || cup.x > GAME_WIDTH - 30) cup.vx *= -0.5;
             
+            // Floor Collision
             if (cup.y >= FLOOR_Y) {
                 cup.y = FLOOR_Y;
                 if (Math.abs(cup.vy) > 1.5) { 
                     cup.vy *= -0.4; 
-                    cup.vx *= 0.8; 
+                    // Friction decay over time -> exponential decay per frame
+                    // approximate for 60hz -> 0.8
+                    cup.vx *= Math.pow(0.8, dt); 
                 } else {
                     cup.vy = 0;
                     cup.vx = 0;
                     cup.rotSpeed = 0;
-                    
-                    // Logic: Cosine > 0 is Flat (Yang), Cosine < 0 is Round (Yin)
                     const phase = Math.cos(cup.rot);
                     cup.isFlat = phase > 0; 
-                    
-                    // Snap Rot
                     cup.rot = cup.isFlat ? 0 : Math.PI; 
                 }
             }
@@ -874,16 +800,17 @@ function updatePhysics() {
 function flipCup(side) {
     if (gameState !== STATE.THROWN) return;
     const cup = side === 'left' ? cups.left : cups.right;
-    
     cup.rotSpeed += (side === 'left' ? 0.3 : -0.3);
     cup.rot += Math.PI / 2; 
+    // Impulse is instantaneous, does not need dt scaling
     cup.vy -= 2.5; 
-    
     createExplosion(cup.x, cup.y, 'white'); 
 }
 
-function update() {
-    frames++;
+function update(dt) {
+    // Increment generic animation timer
+    animTime += dt;
+
     if (gameState === STATE.START) {
         if (keys.space) {
             gameState = STATE.CHARGING;
@@ -891,7 +818,8 @@ function update() {
         }
     } else if (gameState === STATE.CHARGING) {
         if (keys.space) {
-            chargePower += chargeDir * 2;
+            // Charging speed scaled by dt
+            chargePower += chargeDir * 2 * dt;
             if (chargePower > 100 || chargePower < 0) chargeDir *= -1;
         } else {
             throwCups();
@@ -902,20 +830,17 @@ function update() {
             keys.space = false;
         }
     }
-    updatePhysics();
+    updatePhysics(dt);
 }
 
 function draw() {
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     drawLaoYe(); 
     drawHands(); 
-
     if (gameState !== STATE.START && gameState !== STATE.CHARGING) {
         ctx.save();
         ctx.scale(2, 2);
-        
         ctx.fillStyle = COLORS.shadow;
         [cups.left, cups.right].forEach(c => {
             const shadowScale = 1 - (FLOOR_Y - c.y)/300; 
@@ -925,13 +850,10 @@ function draw() {
                 ctx.fill();
             }
         });
-        
         drawPixelShengbei(cups.left);
         drawPixelShengbei(cups.right);
-        
         ctx.restore();
     }
-
     if (gameState === STATE.CHARGING) {
         ctx.save();
         ctx.scale(2, 2);
@@ -943,10 +865,10 @@ function draw() {
         ctx.strokeRect(110, 350, 100, 10);
         ctx.restore();
     }
-    
     updateParticles(); 
 }
 
+// Inputs
 window.addEventListener('keydown', e => {
     if (e.code === 'Space') keys.space = true;
     if (e.code === 'ArrowLeft') { keys.left = true; flipCup('left'); }
@@ -957,7 +879,6 @@ window.addEventListener('keyup', e => {
     if (e.code === 'ArrowLeft') keys.left = false;
     if (e.code === 'ArrowRight') keys.right = false;
 });
-
 const handleTouch = (keyName, isDown) => {
     if (keyName === 'space') {
         keys.space = isDown;
@@ -969,27 +890,30 @@ const handleTouch = (keyName, isDown) => {
     if (keyName === 'left' && isDown) flipCup('left');
     if (keyName === 'right' && isDown) flipCup('right');
 };
-
 if ('ontouchstart' in window) document.getElementById('mobile-controls').style.display = 'flex';
 document.getElementById('btn-space').addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch('space', true); });
 document.getElementById('btn-space').addEventListener('touchend', (e) => { e.preventDefault(); handleTouch('space', false); });
 document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch('left', true); });
 document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch('right', true); });
 
+// --- New Loop with Delta Time ---
 let lastTime = 0;
-const FPS = 60;
-const INTERVAL = 1000 / FPS;
-
 function loop(timestamp) {
     if (!lastTime) lastTime = timestamp;
-    const deltaTime = timestamp - lastTime;
+    
+    // Calculate delta time in ms
+    let deltaTime = timestamp - lastTime;
+    
+    // Cap deltaTime to prevent huge jumps (e.g. switching tabs)
+    if (deltaTime > 50) deltaTime = 50;
+    
+    lastTime = timestamp;
 
-    if (deltaTime >= INTERVAL) {
-        update();
-        draw();
-        // Adjust for timer drift
-        lastTime = timestamp - (deltaTime % INTERVAL);
-    }
+    // Calculate timeScale (1.0 = 60fps)
+    const timeScale = deltaTime / 16.67;
+
+    update(timeScale);
+    draw();
     
     requestAnimationFrame(loop);
 }
