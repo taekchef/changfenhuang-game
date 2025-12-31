@@ -66,6 +66,9 @@
             pointer-events: none;
             z-index: 20;
             text-shadow: 2px 2px 0 #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .pixel-text {
@@ -85,6 +88,33 @@
             border-radius: 4px;
             display: inline-block;
             font-family: 'Ma Shan Zheng', cursive;
+        }
+
+        /* Wish Input Styling */
+        #wish-input {
+            margin-top: 10px;
+            width: 220px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid #8B4513;
+            border-radius: 8px;
+            padding: 8px;
+            color: #FFD700;
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 16px;
+            text-align: center;
+            outline: none;
+            pointer-events: auto; /* Enable typing */
+            transition: all 0.3s ease;
+        }
+
+        #wish-input::placeholder {
+            color: rgba(255, 215, 0, 0.5);
+        }
+
+        #wish-input:focus {
+            background: rgba(0, 0, 0, 0.7);
+            border-color: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
         }
 
         .controls-hint {
@@ -344,6 +374,8 @@
         <div id="ui-layer">
             <div id="status-text" class="pixel-text">按住空格蓄力</div>
             <div id="sub-text" class="sub-text" style="display:none;">空中调整，凑成 [平] + [凸] 为胜</div>
+            <!-- Wish Input Field -->
+            <input type="text" id="wish-input" placeholder="在此默念心中所求..." maxlength="20">
         </div>
         
         <!-- AI Interaction Layer -->
@@ -384,30 +416,43 @@
             <div class="settings-paper">
                 <h3>设置 / Settings</h3>
                 <div id="key-status-display" class="key-status"></div>
-                <p style="font-size:12px; color:#aaa; margin-bottom: 5px;">如需使用自己的 Key，请在下方填入:</p>
-                <input type="password" id="api-key-input" class="input-key" placeholder="AIzaSy...">
+                <p style="font-size:12px; color:#aaa; margin-bottom: 5px;">请输入您的 DeepSeek / Gemini API Key:</p>
+                <input type="password" id="api-key-input" class="input-key" placeholder="sk-...">
                 <button class="close-btn" onclick="saveSettings()">保存配置</button>
                 <button class="close-btn" onclick="clearSettings()" style="background:#555; margin-top:5px;">恢复默认</button>
                 <button class="close-btn" onclick="closeSettingsModal()" style="background:transparent; border:1px solid #555; margin-top:15px;">关闭</button>
+                <br><br>
+                <div style="font-size:10px; color:#aaa;">
+                    推荐使用 <a href="https://platform.deepseek.com/" target="_blank" style="color:#FFD700;">DeepSeek</a> (国内可用) <br>
+                    或 Google Gemini (需魔法)
+                </div>
             </div>
         </div>
     </div>
 
 <script>
 /**
- * 掷圣杯：老爷保号 - Final Release
+ * 掷圣杯：老爷保号 - Final Release (Domestic Friendly)
  */
 
 // ==========================================================
 // 【配置区域】请在下方填入您的 API Key
-// 这是一个免费的 Gemini API Key，仅供朋友体验使用。
-const DEFAULT_API_KEY = "AIzaSyBRjR--lR9ZZr-QYkOoi5X2fBwaIDTY1XY"; 
+// 推荐使用 DeepSeek API (国内直连) 或 Google Gemini
+// ==========================================================
+const DEFAULT_CONFIG = {
+    // 默认使用 DeepSeek (国内最稳)
+    // 申请地址: https://platform.deepseek.com/
+    apiUrl: "https://api.deepseek.com/chat/completions",
+    model: "deepseek-chat",
+    key: "" // <--- 在这里填入您的 DeepSeek API Key (sk-开头)
+};
 // ==========================================================
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const statusText = document.getElementById('status-text');
 const subText = document.getElementById('sub-text');
+const wishInput = document.getElementById('wish-input'); 
 const aiLayer = document.getElementById('ai-interaction-layer');
 const aiButton = document.getElementById('btn-ask-ai');
 const fortuneModal = document.getElementById('fortune-modal');
@@ -423,9 +468,8 @@ const apiKeyInput = document.getElementById('api-key-input');
 const keyStatusDisplay = document.getElementById('key-status-display');
 
 // --- Key Management Logic ---
-let customApiKey = localStorage.getItem('shengbei_gemini_key') || "";
+let customApiKey = localStorage.getItem('shengbei_api_key') || "";
 
-// Initialize settings UI state
 updateKeyStatus(!!customApiKey);
 
 function updateKeyStatus(hasCustom) {
@@ -433,7 +477,7 @@ function updateKeyStatus(hasCustom) {
         keyStatusDisplay.innerHTML = "🔧 当前使用: 自定义 Key";
         keyStatusDisplay.style.color = "#FFD700";
     } else {
-        if (DEFAULT_API_KEY && DEFAULT_API_KEY.length > 5) {
+        if (DEFAULT_CONFIG.key && DEFAULT_CONFIG.key.length > 5) {
             keyStatusDisplay.innerHTML = "✅ 当前使用: 默认 Key (已配置)";
             keyStatusDisplay.style.color = "#4CAF50";
         } else {
@@ -444,7 +488,7 @@ function updateKeyStatus(hasCustom) {
 }
 
 function getEffectiveKey() {
-    return customApiKey && customApiKey.trim().length > 0 ? customApiKey : DEFAULT_API_KEY;
+    return customApiKey && customApiKey.trim().length > 0 ? customApiKey : DEFAULT_CONFIG.key;
 }
 
 function showSettings() {
@@ -460,9 +504,9 @@ function saveSettings() {
     const input = apiKeyInput.value.trim();
     if (input.length > 0) {
         customApiKey = input;
-        localStorage.setItem('shengbei_gemini_key', customApiKey);
+        localStorage.setItem('shengbei_api_key', customApiKey);
         updateKeyStatus(true);
-        alert("自定义 Key 已保存！优先使用您的 Key。");
+        alert("Key 已保存！");
     } else {
         clearSettings();
     }
@@ -472,13 +516,18 @@ function saveSettings() {
 function clearSettings() {
     customApiKey = "";
     apiKeyInput.value = "";
-    localStorage.removeItem('shengbei_gemini_key');
+    localStorage.removeItem('shengbei_api_key');
     updateKeyStatus(false);
 }
 
 settingsBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     showSettings();
+});
+
+// Prevent spacebar from triggering throw when typing wish
+wishInput.addEventListener('keydown', (e) => {
+    e.stopPropagation();
 });
 
 // Handle High DPI
@@ -526,17 +575,15 @@ const keys = { space: false, left: false, right: false };
 let particles = [];
 let currentFortune = null; 
 
-// --- Fixed Fortunes Database (Optimized for Positive Experience) ---
+// --- Fixed Fortunes Database (Optimized) ---
 const FORTUNES = [
     { title: "第一签 大吉", poem: "七层宝塔周周围，\n几多神仙下界来。\n今日龙楼把宴会，\n想君财帛自天来。" },
     { title: "第二签 上吉", poem: "枯木逢春色更鲜，\n主公欢喜地生连。\n如今喜得天赐福，\n祸去灾消福禄全。" },
     { title: "第三签 中平", poem: "一点丹心以此为，\n长江风浪不须推。\n目前只管勤耕作，\n日后荣华自然回。" },
     { title: "第四签 上吉", poem: "日出东方满天红，\n愁云消散见青空。\n此时百事皆如意，\n名利双收显威风。" },
-    // { title: "第五签 中下", poem: "乌云遮月暗朦胧，\n行船遇浪打头风。\n此时若问心中事，\n恰似推车上险峰。" }, // 注释掉凶签，提升体验
-    // { title: "第六签 下下", poem: "风中烛火影摇红，\n夜半行船遇打头。\n只好守旧随缘过，\n免得劳心转更加。" }, // 注释掉凶签
     { title: "第七签 大吉", poem: "鹏鸟高飞千万里，\n一朝得志上青云。\n若问功名财利事，\n恰如锦上又添花。" },
     { title: "第八签 中平", poem: "行船把舵要在中，\n不须使力与使功。\n潮水来时风又顺，\n自然载得宝归篷。" },
-    { title: "第九签 上上", poem: "登山涉水正天台，\n少小姻缘逐渐来。\n此去行人得利便，\n贵人接引笑颜开。" } // 新增一支吉签补位
+    { title: "第九签 上上", poem: "登山涉水正天台，\n少小姻缘逐渐来。\n此去行人得利便，\n贵人接引笑颜开。" }
 ];
 
 const XIAOBEI_MSGS = [
@@ -561,7 +608,10 @@ const WENBEI_MSGS = [
     "静心修德，福报自来。"
 ];
 
-async function callGemini(type) {
+/**
+ * Universal AI Caller (Supports OpenAI-Format, e.g. DeepSeek/Kimi/Gemini-Compat)
+ */
+async function callAI(type) {
     const effectiveKey = getEffectiveKey();
     
     if (!effectiveKey) {
@@ -577,39 +627,62 @@ async function callGemini(type) {
     const loadingTexts = ["老爷正在查阅天书...", "香烟袅袅，沟通天庭...", "老爷正在斟酌...", "圣杯落地，神机显现..."];
     loadingText.innerText = loadingTexts[Math.floor(Math.random() * loadingTexts.length)];
 
-    let prompt = "";
+    // Get User Wish
+    const userWish = wishInput.value.trim();
+    let wishContext = "";
+    if (userWish) {
+        wishContext = ` The believer has a specific wish/question: "${userWish}". Please interpret the result specifically in the context of this wish.`;
+    }
+
+    let systemPrompt = "You are 'Lao Ye' (老爷), a wise, kind, and ancient Chaoshan/Teochew deity. Speak in Chinese. Be protective, authoritative but warm. Keep responses concise (under 60 words).";
+    let userPrompt = "";
     
     if (type === "SHENGBEI") {
         const randomIndex = Math.floor(Math.random() * FORTUNES.length);
         currentFortune = FORTUNES[randomIndex];
         fortuneTitle.innerText = "✨ " + currentFortune.title + " ✨";
         fortuneText.innerText = currentFortune.poem;
-        prompt = `You are 'Lao Ye' (老爷), a wise Chaoshan deity. A believer drew the fortune sign: "${currentFortune.title}" with the poem: "${currentFortune.poem.replace(/\n/g, ', ')}". Provide a brief, wise, warm interpretation (解签) in Chinese (<60 words). Tone: Ancient, protective. Keep it under 60 words in Chinese. Do not display word count or meta information.`;
+        userPrompt = `A believer drew the fortune sign: "${currentFortune.title}" with the poem: "${currentFortune.poem.replace(/\n/g, ', ')}".${wishContext} Provide a brief interpretation (解签).`;
     } else if (type === "XIAOBEI") {
         const randomIndex = Math.floor(Math.random() * XIAOBEI_MSGS.length);
         const msg = XIAOBEI_MSGS[randomIndex];
         fortuneTitle.innerText = "☁️ 老爷笑了 ☁️";
         fortuneText.innerText = msg;
-        prompt = `You are 'Lao Ye'. Believer threw 'Xiaobei'. You said: "${msg}". Briefly explain why in humorous/kind way. Tone: Ancient grandfather. Keep it under 40 words in Chinese. Do not display word count.`;
+        userPrompt = `The believer threw 'Xiaobei' (Laughing Cup). You said: "${msg}".${wishContext} Briefly explain why you are laughing in a humorous way.`;
     } else {
         const randomIndex = Math.floor(Math.random() * WENBEI_MSGS.length);
         const msg = WENBEI_MSGS[randomIndex];
         fortuneTitle.innerText = "⛰️ 老爷不语 ⛰️";
         fortuneText.innerText = msg;
-        prompt = `You are 'Lao Ye'. Believer threw 'Wenbei'. You said: "${msg}". Briefly explain why in stern/authoritative way. Tone: Ancient strict deity. Keep it under 40 words in Chinese. Do not display word count.`;
+        userPrompt = `The believer threw 'Wenbei' (Stable Cup/Refusal). You said: "${msg}".${wishContext} Briefly explain why you refused in a stern way.`;
     }
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${effectiveKey}`, {
+        // Use DeepSeek / OpenAI Compatible Format
+        // Note: Gemini also has an OpenAI-compatible endpoint now, but we focus on DeepSeek/Kimi structure
+        const response = await fetch(DEFAULT_CONFIG.apiUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${effectiveKey}`
+            },
+            body: JSON.stringify({ 
+                model: DEFAULT_CONFIG.model,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                stream: false
+            })
         });
 
         const data = await response.json();
-        if (data.error) throw new Error(data.error.message);
         
-        const text = data.candidates[0].content.parts[0].text;
+        if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+        
+        // Handle standard OpenAI format response
+        const text = data.choices[0].message.content;
+        
         loadingView.style.display = 'none';
         resultView.style.display = 'block';
         fortuneAiComment.innerText = "【老爷神示】\n" + text;
@@ -619,7 +692,14 @@ async function callGemini(type) {
         console.error(error);
         loadingView.style.display = 'none';
         resultView.style.display = 'block';
-        fortuneAiComment.innerText = "老爷信号不佳，请以此签文/神谕为准";
+        
+        // Fallback messages for offline/error mode
+        let fallbackMsg = "";
+        if (type === "SHENGBEI") fallbackMsg = "【老爷神示】\n心诚则灵，所求之事必有回响。此签大吉，安心前行即可。";
+        else if (type === "XIAOBEI") fallbackMsg = "【老爷神示】\n莫急莫急，此事看来您心中早有定数，何必再问？开心便好。";
+        else fallbackMsg = "【老爷神示】\n时机未到，暂且修身养性，待时运流转再来问询。";
+        
+        fortuneAiComment.innerText = fallbackMsg + "\n(网络不佳，显示离线解读)";
         fortuneAiComment.style.display = 'block';
     }
 }
@@ -630,7 +710,7 @@ function closeFortuneModal() {
 
 aiButton.addEventListener('click', (e) => {
     e.stopPropagation();
-    callGemini(resultType);
+    callAI(resultType);
 });
 
 
@@ -660,25 +740,6 @@ const SHENGBEI_PIXELS = {
         [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]
     ]
 };
-
-const UI_ICONS = {
-    yin: [
-        [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0], [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0], [0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
-        [0,1,1,1,1,2,2,2,2,2,1,1,1,1,1,0], [0,1,1,1,1,2,2,2,2,2,1,1,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0], [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
-        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0], [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0], [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-    ],
-    yang: [
-        [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0], [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0], [0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
-        [0,1,1,1,1,2,2,2,2,2,1,1,1,1,1,0], [0,1,1,1,1,2,2,2,2,2,1,1,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0], [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
-        [0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0], [0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0], [0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-    ]
-}
 
 function drawPixelSprite(x, y, grid, colorMap, scale = 2, rot = 0, auraColor = null) {
     ctx.save();
@@ -874,10 +935,10 @@ function resetGame() {
     statusText.innerText = "按住空格蓄力";
     subText.style.display = "none"; 
     statusText.style.color = "white";
+    wishInput.style.display = "block"; // Show input again
     aiLayer.style.display = 'none';
     resultType = "";
     currentFortune = null;
-    currentGameSpeed = 1.0;
     cups.left = { x: 80, y: FLOOR_Y, vx: 0, vy: 0, rot: 0, rotSpeed: 0, isFlat: false };
     cups.right = { x: 240, y: FLOOR_Y, vx: 0, vy: 0, rot: 0, rotSpeed: 0, isFlat: false };
 }
@@ -885,6 +946,10 @@ function resetGame() {
 function throwCups() {
     gameState = STATE.THROWN;
     subText.style.display = "block"; 
+    // Do not hide wish input immediately if user wants to see it, 
+    // or hide it to declutter. Let's hide it for cleaner view.
+    wishInput.style.display = "none"; 
+    
     const power = 14 + (chargePower / 100) * 4; 
     
     cups.left.x = 80;
