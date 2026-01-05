@@ -321,15 +321,31 @@
             font-style: italic;
         }
 
-        .close-btn {
-            background: #333;
+        /* Buttons in Modal */
+        .modal-btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .close-btn, .restart-btn {
             color: white;
             border: none;
-            padding: 10px 20px;
-            margin-top: 15px;
+            padding: 10px 15px;
             cursor: pointer;
             font-family: 'Courier New', monospace;
             border-radius: 5px;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .close-btn {
+            background: #555;
+        }
+
+        .restart-btn {
+            background: #D93829; /* Red for emphasis */
         }
 
         .input-key {
@@ -407,7 +423,11 @@
                 <div class="fortune-title" id="fortune-title">上上签</div>
                 <div class="fortune-content" id="fortune-text"></div>
                 <div class="fortune-ai-comment" id="fortune-ai-comment" style="display:none;"></div>
-                <button class="close-btn" onclick="closeFortuneModal()">收下签文</button>
+                
+                <div class="modal-btn-group">
+                    <button class="close-btn" onclick="closeFortuneModal()">收下签文</button>
+                    <button class="restart-btn" onclick="restartWithNewWish()">再求一事</button>
+                </div>
             </div>
         </div>
 
@@ -432,19 +452,17 @@
 
 <script>
 /**
- * 掷圣杯：老爷保号 - Final Release (Domestic Friendly)
+ * 掷圣杯：老爷保号 - Final Release
  */
 
 // ==========================================================
 // 【配置区域】请在下方填入您的 API Key
-// 推荐使用 DeepSeek API (国内直连) 或 Google Gemini
-// ==========================================================
 const DEFAULT_CONFIG = {
     // 默认使用 DeepSeek (国内最稳)
     // 申请地址: https://platform.deepseek.com/
     apiUrl: "https://api.deepseek.com/chat/completions",
     model: "deepseek-chat",
-    key: "sk-90bf60a9f9424f79bf3350983e008fcf" // <--- 请在此处双引号内粘贴您的 DeepSeek API Key (sk-开头)
+    key: "sk-90bf60a9f9424f79bf3350983e008fcf" // <--- 默认 Key
 };
 // ==========================================================
 
@@ -562,6 +580,8 @@ let animTime = 0;
 let chargePower = 0;
 let chargeDir = 1;
 let resultType = ""; 
+// New Flag for Divine Intervention
+let blessingActive = false; 
 
 const GRAVITY = 0.15; 
 const FLOOR_Y = 380; 
@@ -575,15 +595,45 @@ const keys = { space: false, left: false, right: false };
 let particles = [];
 let currentFortune = null; 
 
-// --- Fixed Fortunes Database (Optimized) ---
+// --- EXPANDED FORTUNES DATABASE (No bad luck) ---
 const FORTUNES = [
-    { title: "第一签 大吉", poem: "七层宝塔周周围，\n几多神仙下界来。\n今日龙楼把宴会，\n想君财帛自天来。" },
-    { title: "第二签 上吉", poem: "枯木逢春色更鲜，\n主公欢喜地生连。\n如今喜得天赐福，\n祸去灾消福禄全。" },
-    { title: "第三签 中平", poem: "一点丹心以此为，\n长江风浪不须推。\n目前只管勤耕作，\n日后荣华自然回。" },
-    { title: "第四签 上吉", poem: "日出东方满天红，\n愁云消散见青空。\n此时百事皆如意，\n名利双收显威风。" },
-    { title: "第七签 大吉", poem: "鹏鸟高飞千万里，\n一朝得志上青云。\n若问功名财利事，\n恰如锦上又添花。" },
-    { title: "第八签 中平", poem: "行船把舵要在中，\n不须使力与使功。\n潮水来时风又顺，\n自然载得宝归篷。" },
-    { title: "第九签 上上", poem: "登山涉水正天台，\n少小姻缘逐渐来。\n此去行人得利便，\n贵人接引笑颜开。" }
+    // 上上 / 大吉 (General)
+    { title: "第一签 上上", poem: "彩凤呈祥瑞气多，\n身荣富贵乐如何。\n腰金衣紫人钦敬，\n一世荣华不蹉跎。" },
+    { title: "第二签 大吉", poem: "鲲鹏万里任飞扬，\n好景良辰在异乡。\n不但功名能显达，\n荣华富贵寿而康。" },
+    { title: "第三签 上上", poem: "枯木逢春色更鲜，\n主公欢喜地生连。\n如今喜得天赐福，\n祸去灾消福禄全。" },
+    { title: "第四签 大吉", poem: "七层宝塔周周围，\n几多神仙下界来。\n今日龙楼把宴会，\n想君财帛自天来。" },
+    { title: "第五签 上吉", poem: "日出东方满天红，\n愁云消散见青空。\n此时百事皆如意，\n名利双收显威风。" },
+    { title: "第六签 大吉", poem: "登山涉水正天台，\n少小姻缘逐渐来。\n此去行人得利便，\n贵人接引笑颜开。" },
+    { title: "第七签 上吉", poem: "梅花冻雪绽芳菲，\n一夜春风逐暖归。\n君子求谋皆遂意，\n贵人相助显光辉。" },
+    { title: "第八签 上上", poem: "平生作善感苍天，\n福寿绵长胜昔贤。\n今日得逢真造化，\n荣华富贵万万年。" },
+    
+    // 中吉 / 上吉 (Career/Study)
+    { title: "第九签 中吉", poem: "舟行滩上忽遇风，\n费尽工夫暂未通。\n只有贵人轻助力，\n依然依旧挂帆蓬。" },
+    { title: "第十签 上吉", poem: "十年窗下苦功深，\n一旦成名四海钦。\n显祖荣宗人敬重，\n不须更去问知音。" },
+    { title: "第十一签 中吉", poem: "经营作事要心坚，\n费力劳心恐未全。\n若得贵人轻指引，\n依然平地也就是天。" },
+    { title: "第十二签 上吉", poem: "青云有路志登天，\n金榜题名在目前。\n稳步蟾宫折桂去，\n光宗耀祖好流传。" },
+
+    // 中平 (Steady/Patience)
+    { title: "第十三签 中平", poem: "行船把舵要在中，\n不须使力与使功。\n潮水来时风又顺，\n自然载得宝归篷。" },
+    { title: "第十四签 中平", poem: "一点丹心以此为，\n长江风浪不须推。\n目前只管勤耕作，\n日后荣华自然回。" },
+    { title: "第十五签 中平", poem: "平地行舟水浪多，\n必须仔细把船拖。\n若能把舵心安稳，\n不怕风波奈我何。" },
+    
+    // Health/Peace/Family (Best for Divine Blessing)
+    { title: "第十六签 上吉", poem: "福如东海寿如山，\n君尔何须叹苦难。\n命内自然逢大吉，\n祈求神圣保平安。" },
+    { title: "第十七签 大吉", poem: "春来花发映阳台，\n万里车书尽带来。\n好景良辰君可见，\n门庭喜气自天来。" },
+    { title: "第十八签 上上", poem: "金乌西坠兔东升，\n日夜循环暂不停。\n僧道得之无不利，\n工商农士各称心。" },
+    { title: "第十九签 大吉", poem: "家宅清吉喜气生，\n田园禾稻岁丰登。\n又值春风多富贵，\n门庭瑞气百般兴。" },
+    { title: "第二十签 上上", poem: "灵芝瑞草生庭前，\n余庆流传亿万年。\n富贵荣华天注定，\n五世其昌福绵绵。" },
+    { title: "第二十一签 大吉", poem: "求谋遂意事亨通，\n一理精通万理同。\n春风吹起虽未觉，\n花开叶茂满园红。" },
+    { title: "第二十二签 上上", poem: "疾病消除身泰康，\n田园成熟岁收长。\n求谋得利皆如意，\n合家老幼尽安康。" },
+    { title: "第二十三签 上吉", poem: "福禄荣华天注定，\n不用苦心去强求。\n自有贵人相接引，\n何须日夜以此忧。" },
+    { title: "第二十四签 大吉", poem: "好将心事快乐行，\n神明护佑报平安。\n若问前程何日得，\n也须修德以此观。" },
+    { title: "第二十五签 上上", poem: "天开地辟结良缘，\n日吉时良万事全。\n若得此签非小可，\n人行中正帝王宣。" },
+    { title: "第二十六签 大吉", poem: "巍巍独步向云间，\n玉殿千官第一班。\n富贵荣华天付与，\n福如东海寿如山。" },
+    { title: "第二十七签 上吉", poem: "一重山后一重水，\n未必山重水又深。\n只把寸心通大道，\n自然到处有知音。" },
+    { title: "第二十八签 大吉", poem: "君子此时欲问名，\n如鱼得水在池庭。\n风云际会龙开口，\n便有雷声震九冥。" },
+    { title: "第二十九签 上上", poem: "祖宗积得德流芳，\n福泽绵绵世泽长。\n今日子孙多发达，\n荣华富贵姓名香。" },
+    { title: "第三十签 上吉", poem: "喜鹊檐前报好音，\n知君千里欲归心。\n今朝得遇真知己，\n对此风光乐且吟。" }
 ];
 
 const XIAOBEI_MSGS = [
@@ -594,7 +644,11 @@ const XIAOBEI_MSGS = [
     "此卦为笑，意在言外。",
     "你其实已经知道答案了。",
     "问题太模糊，老爷听不懂。",
-    "且放宽心，一笑置之。"
+    "且放宽心，一笑置之。",
+    "老爷正在吃茶，稍后再问。",
+    "问题太可爱，老爷笑了。",
+    "心诚则灵，勿执着于签。",
+    "此事天机，不可说破。"
 ];
 
 const WENBEI_MSGS = [
@@ -605,95 +659,116 @@ const WENBEI_MSGS = [
     "暂守本分，勿生贪念。",
     "老爷在忙，改日再来。",
     "此事不可为，慎之。",
-    "静心修德，福报自来。"
+    "静心修德，福报自来。",
+    "欲速则不达，且慢行。",
+    "静观其变，不宜躁进。",
+    "心中有碍，先去心魔。",
+    "莫信直中直，须防仁不仁。"
 ];
 
 /**
- * Universal AI Caller (Supports OpenAI-Format, e.g. DeepSeek/Kimi/Gemini-Compat)
+ * 1. Intent Analysis: Check if wish is about health/family immediately after throwing
  */
-async function callAI(type) {
-    const effectiveKey = getEffectiveKey();
+async function checkWishIntent() {
+    const wish = wishInput.value.trim();
+    if (!wish) return; // No wish, no blessing
     
-    if (!effectiveKey) {
-        showSettings();
-        return;
-    }
-
-    fortuneModal.style.display = 'flex';
-    loadingView.style.display = 'flex';
-    resultView.style.display = 'none';
-    fortuneAiComment.style.display = 'none';
-    
-    const loadingTexts = ["老爷正在查阅天书...", "香烟袅袅，沟通天庭...", "老爷正在斟酌...", "圣杯落地，神机显现..."];
-    loadingText.innerText = loadingTexts[Math.floor(Math.random() * loadingTexts.length)];
-
-    // Get User Wish
-    const userWish = wishInput.value.trim();
-    let wishContext = "";
-    if (userWish) {
-        wishContext = ` The believer has a specific wish/question: "${userWish}". Please interpret the result specifically in the context of this wish.`;
-    }
-
-    let systemPrompt = "You are 'Lao Ye' (老爷), a wise, kind, and ancient Chaoshan/Teochew deity. Speak in Chinese. Be protective, authoritative but warm. Keep responses concise (under 60 words).";
-    let userPrompt = "";
-    
-    if (type === "SHENGBEI") {
-        const randomIndex = Math.floor(Math.random() * FORTUNES.length);
-        currentFortune = FORTUNES[randomIndex];
-        fortuneTitle.innerText = "✨ " + currentFortune.title + " ✨";
-        fortuneText.innerText = currentFortune.poem;
-        userPrompt = `A believer drew the fortune sign: "${currentFortune.title}" with the poem: "${currentFortune.poem.replace(/\n/g, ', ')}".${wishContext} Provide a brief interpretation (解签).`;
-    } else if (type === "XIAOBEI") {
-        const randomIndex = Math.floor(Math.random() * XIAOBEI_MSGS.length);
-        const msg = XIAOBEI_MSGS[randomIndex];
-        fortuneTitle.innerText = "☁️ 老爷笑了 ☁️";
-        fortuneText.innerText = msg;
-        userPrompt = `The believer threw 'Xiaobei' (Laughing Cup). You said: "${msg}".${wishContext} Briefly explain why you are laughing in a humorous way.`;
-    } else {
-        const randomIndex = Math.floor(Math.random() * WENBEI_MSGS.length);
-        const msg = WENBEI_MSGS[randomIndex];
-        fortuneTitle.innerText = "⛰️ 老爷不语 ⛰️";
-        fortuneText.innerText = msg;
-        userPrompt = `The believer threw 'Wenbei' (Stable Cup/Refusal). You said: "${msg}".${wishContext} Briefly explain why you refused in a stern way.`;
-    }
+    const key = getEffectiveKey();
+    if (!key) return; // No key, no AI blessing
 
     try {
-        // Use DeepSeek / OpenAI Compatible Format
-        // Note: Gemini also has an OpenAI-compatible endpoint now, but we focus on DeepSeek/Kimi structure
         const response = await fetch(DEFAULT_CONFIG.apiUrl, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${effectiveKey}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
             body: JSON.stringify({ 
                 model: DEFAULT_CONFIG.model,
                 messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
+                    { role: "system", content: "You are an intent classifier. If the user's wish implies praying for HEALTH, SAFETY, or RECOVERY for FAMILY members or FRIENDS, return 'YES'. Otherwise return 'NO'." },
+                    { role: "user", content: `Wish: ${wish}` }
                 ],
                 stream: false
             })
         });
-
+        
         const data = await response.json();
+        const result = data.choices[0].message.content.trim().toUpperCase();
         
-        if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+        if (result.includes("YES")) {
+            console.log("老爷慈悲，触发神佑！");
+            blessingActive = true;
+        }
+    } catch (e) {
+        console.log("Intent check failed:", e);
+    }
+}
+
+/**
+ * 2. Result Interpretation (AI)
+ */
+async function callAI(type) {
+    const effectiveKey = getEffectiveKey();
+    if (!effectiveKey) { showSettings(); return; }
+
+    fortuneModal.style.display = 'flex';
+    loadingView.style.display = 'flex';
+    resultView.style.display = 'none';
+    
+    const loadingTexts = ["老爷正在查阅天书...", "香烟袅袅，沟通天庭...", "老爷正在斟酌...", "圣杯落地，神机显现..."];
+    loadingText.innerText = loadingTexts[Math.floor(Math.random() * loadingTexts.length)];
+
+    const userWish = wishInput.value.trim();
+    let wishContext = userWish ? ` The believer has a wish: "${userWish}". Interpret result in this context.` : "";
+
+    let systemPrompt = "You are 'Lao Ye' (老爷), a wise, kind Chaoshan deity. Speak in Chinese. Be protective & warm. Keep responses under 60 words. No meta info.";
+    let userPrompt = "";
+    
+    if (type === "SHENGBEI") {
+        // If divine blessing was active, force picking from Best fortunes
+        if (blessingActive) {
+            // Filter only 上上 or 大吉
+            const bestFortunes = FORTUNES.filter(f => f.title.includes("上上") || f.title.includes("大吉"));
+            currentFortune = bestFortunes[Math.floor(Math.random() * bestFortunes.length)];
+        } else {
+            const randomIndex = Math.floor(Math.random() * FORTUNES.length);
+            currentFortune = FORTUNES[randomIndex];
+        }
         
-        // Handle standard OpenAI format response
+        fortuneTitle.innerText = "✨ " + currentFortune.title + " ✨";
+        fortuneText.innerText = currentFortune.poem;
+        userPrompt = `A believer drew fortune: "${currentFortune.title}" with poem: "${currentFortune.poem.replace(/\n/g, ', ')}".${wishContext} Provide a brief interpretation.`;
+    } else if (type === "XIAOBEI") {
+        const msg = XIAOBEI_MSGS[Math.floor(Math.random() * XIAOBEI_MSGS.length)];
+        fortuneTitle.innerText = "☁️ 老爷笑了 ☁️";
+        fortuneText.innerText = msg;
+        userPrompt = `Believer threw 'Xiaobei'. You said: "${msg}".${wishContext} Explain why laughing kindly.`;
+    } else {
+        const msg = WENBEI_MSGS[Math.floor(Math.random() * WENBEI_MSGS.length)];
+        fortuneTitle.innerText = "⛰️ 老爷不语 ⛰️";
+        fortuneText.innerText = msg;
+        userPrompt = `Believer threw 'Wenbei'. You said: "${msg}".${wishContext} Explain why refused sternly.`;
+    }
+
+    try {
+        const response = await fetch(DEFAULT_CONFIG.apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${effectiveKey}` },
+            body: JSON.stringify({ 
+                model: DEFAULT_CONFIG.model,
+                messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }]
+            })
+        });
+        const data = await response.json();
         const text = data.choices[0].message.content;
         
         loadingView.style.display = 'none';
         resultView.style.display = 'block';
         fortuneAiComment.innerText = "【老爷神示】\n" + text;
         fortuneAiComment.style.display = 'block';
-
     } catch (error) {
         console.error(error);
         loadingView.style.display = 'none';
         resultView.style.display = 'block';
         
-        // Fallback messages for offline/error mode
         let fallbackMsg = "";
         if (type === "SHENGBEI") fallbackMsg = "【老爷神示】\n心诚则灵，所求之事必有回响。此签大吉，安心前行即可。";
         else if (type === "XIAOBEI") fallbackMsg = "【老爷神示】\n莫急莫急，此事看来您心中早有定数，何必再问？开心便好。";
@@ -708,37 +783,27 @@ function closeFortuneModal() {
     fortuneModal.style.display = 'none';
 }
 
+// 🆕 New Function: Restart with fresh wish
+function restartWithNewWish() {
+    closeFortuneModal();
+    resetGame();
+}
+
 aiButton.addEventListener('click', (e) => {
     e.stopPropagation();
     callAI(resultType);
 });
 
-
-// --- Pixel Art Drawing ---
+// --- Drawing ---
 function drawRect(x, y, w, h, color) {
     ctx.fillStyle = color;
     ctx.fillRect(Math.floor(x), Math.floor(y), w, h);
 }
 
 const SHENGBEI_PIXELS = {
-    flat: [
-        [0,0,0,1,1,1,1,1,0,0,0,0], [0,0,1,1,1,2,2,2,1,0,0,0], [0,1,1,1,2,2,2,2,1,1,0,0],
-        [1,1,1,1,2,2,2,2,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,0], [1,1,1,1,0,0,0,0,1,1,1,0],
-        [1,1,1,0,0,0,0,0,0,1,1,0], [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]
-    ],
-    round: [
-        [0,0,0,1,1,1,1,1,0,0,0,0], [0,0,1,1,1,1,1,1,1,0,0,0], [0,1,1,1,2,2,1,1,1,1,0,0],
-        [1,1,1,2,2,2,2,1,1,1,1,0], [1,1,1,2,2,2,2,1,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,0],
-        [1,1,1,0,0,0,0,0,0,1,1,0], [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]
-    ],
-    side: [
-        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0], [0,1,1,1,1,1,1,1,1,1,0,0], [1,1,1,1,1,1,1,1,1,1,1,0],
-        [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0], [0,0,0,0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]
-    ]
+    flat: [[0,0,0,1,1,1,1,1,0,0,0,0], [0,0,1,1,1,2,2,2,1,0,0,0], [0,1,1,1,2,2,2,2,1,1,0,0],[1,1,1,1,2,2,2,2,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,0], [1,1,1,1,0,0,0,0,1,1,1,0],[1,1,1,0,0,0,0,0,0,1,1,0], [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0],[0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]],
+    round: [[0,0,0,1,1,1,1,1,0,0,0,0], [0,0,1,1,1,1,1,1,1,0,0,0], [0,1,1,1,2,2,1,1,1,1,0,0],[1,1,1,2,2,2,2,1,1,1,1,0], [1,1,1,2,2,2,2,1,1,1,1,0], [1,1,1,1,1,1,1,1,1,1,1,0],[1,1,1,0,0,0,0,0,0,1,1,0], [1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0],[0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]],
+    side: [[0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0], [0,1,1,1,1,1,1,1,1,1,0,0], [1,1,1,1,1,1,1,1,1,1,1,0],[1,1,0,0,0,0,0,0,0,1,1,0], [1,0,0,0,0,0,0,0,0,0,1,0], [0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0,0,0,0,0]]
 };
 
 function drawPixelSprite(x, y, grid, colorMap, scale = 2, rot = 0, auraColor = null) {
@@ -747,13 +812,8 @@ function drawPixelSprite(x, y, grid, colorMap, scale = 2, rot = 0, auraColor = n
     ctx.rotate(rot);
     const offset = (grid.length / 2) * scale;
     if (auraColor) {
-        ctx.shadowColor = auraColor;
-        ctx.shadowBlur = 20;
-        ctx.fillStyle = auraColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, 15, 0, Math.PI*2);
-        ctx.fill();
-        ctx.shadowBlur = 0; 
+        ctx.shadowColor = auraColor; ctx.shadowBlur = 20; ctx.fillStyle = auraColor;
+        ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0; 
     }
     for(let r=0; r<grid.length; r++) {
         for(let c=0; c<grid[0].length; c++) {
@@ -768,48 +828,20 @@ function drawPixelSprite(x, y, grid, colorMap, scale = 2, rot = 0, auraColor = n
 }
 
 function drawLaoYe() {
-    const cx = GAME_WIDTH / 2;
-    const cy = 120;
-    ctx.save();
-    ctx.scale(2, 2);
-
+    const cx = GAME_WIDTH / 2; const cy = 120;
+    ctx.save(); ctx.scale(2, 2);
     ctx.globalAlpha = 0.2 + Math.sin(animTime * 0.05) * 0.1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 60, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.gold;
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-
-    drawRect(cx - 30, cy, 60, 80, '#A62619');
-    drawRect(cx - 10, cy, 20, 80, COLORS.gold);
-    drawRect(cx - 40, cy + 5, 10, 30, '#801A10');
-    drawRect(cx + 30, cy + 5, 10, 30, '#801A10');
-    drawRect(cx - 15, cy - 35, 30, 35, '#E8C0A0');
-    drawRect(cx - 15, cy - 35, 30, 10, 'black');
-    drawRect(cx - 10, cy - 45, 20, 10, COLORS.gold);
-    drawRect(cx - 10, cy - 5, 20, 25, 'white');
-    drawRect(cx - 5, cy + 20, 10, 15, '#ddd');
-    drawRect(cx - 8, cy - 20, 4, 2, 'black');
-    drawRect(cx + 4, cy - 20, 4, 2, 'black');
-    drawRect(0, 250, GAME_WIDTH, 100, COLORS.altar);
-    drawRect(cx - 20, 240, 40, 20, '#CD7F32');
-    drawRect(cx - 15, 235, 30, 5, '#A0522D');
-    drawRect(cx - 5, 215, 2, 20, '#D2691E');
-    drawRect(cx, 210, 2, 25, '#D2691E');
-    drawRect(cx + 5, 215, 2, 20, '#D2691E');
-
-    if (Math.floor(animTime) % 4 === 0) {
-        if (Math.random() < 0.2) {
-             particles.push({
-                x: (cx * 2) + (Math.random() - 0.5) * 10,
-                y: 420, 
-                vx: (Math.random() - 0.5) * 0.5,
-                vy: -0.5 - Math.random() * 0.5,
-                life: 80,
-                color: 'rgba(200,200,200,0.4)',
-                size: 4 
-            });
-        }
+    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.fillStyle = COLORS.gold; ctx.fill(); ctx.globalAlpha = 1.0;
+    drawRect(cx - 30, cy, 60, 80, '#A62619'); drawRect(cx - 10, cy, 20, 80, COLORS.gold);
+    drawRect(cx - 40, cy + 5, 10, 30, '#801A10'); drawRect(cx + 30, cy + 5, 10, 30, '#801A10');
+    drawRect(cx - 15, cy - 35, 30, 35, '#E8C0A0'); drawRect(cx - 15, cy - 35, 30, 10, 'black');
+    drawRect(cx - 10, cy - 45, 20, 10, COLORS.gold); drawRect(cx - 10, cy - 5, 20, 25, 'white');
+    drawRect(cx - 5, cy + 20, 10, 15, '#ddd'); drawRect(cx - 8, cy - 20, 4, 2, 'black');
+    drawRect(cx + 4, cy - 20, 4, 2, 'black'); drawRect(0, 250, GAME_WIDTH, 100, COLORS.altar);
+    drawRect(cx - 20, 240, 40, 20, '#CD7F32'); drawRect(cx - 15, 235, 30, 5, '#A0522D');
+    drawRect(cx - 5, 215, 2, 20, '#D2691E'); drawRect(cx, 210, 2, 25, '#D2691E'); drawRect(cx + 5, 215, 2, 20, '#D2691E');
+    if (Math.floor(animTime) % 4 === 0 && Math.random() < 0.2) {
+         particles.push({x: (cx * 2) + (Math.random() - 0.5) * 10, y: 420, vx: (Math.random() - 0.5) * 0.5, vy: -0.5 - Math.random() * 0.5, life: 80, color: 'rgba(200,200,200,0.4)', size: 4});
     }
     ctx.restore();
 }
@@ -819,27 +851,13 @@ function drawHands() {
     if (gameState === STATE.CHARGING) yOffset = Math.sin(animTime * 0.8) * 2 + chargePower * 0.5;
     else if (gameState === STATE.THROWN) yOffset = 300; 
     else if (gameState === STATE.START) yOffset = Math.sin(animTime * 0.05) * 3;
-
-    const lx = 80;
-    const rx = 240;
-    const by = 400 + yOffset;
-
-    ctx.save();
-    ctx.scale(2, 2);
-
-    drawRect(lx - 20, by, 40, 40, COLORS.skin);
-    drawRect(lx - 15, by - 5, 10, 20, COLORS.skin);
-    drawRect(lx - 5, by - 10, 10, 20, COLORS.skin);
-    drawRect(lx + 5, by - 8, 10, 18, COLORS.skin);
-    drawRect(rx - 20, by, 40, 40, COLORS.skin);
-    drawRect(rx + 5, by - 5, 10, 20, COLORS.skin);
-    drawRect(rx - 5, by - 10, 10, 20, COLORS.skin);
-    drawRect(rx - 15, by - 8, 10, 18, COLORS.skin);
-    
+    const lx = 80; const rx = 240; const by = 400 + yOffset;
+    ctx.save(); ctx.scale(2, 2);
+    drawRect(lx - 20, by, 40, 40, COLORS.skin); drawRect(lx - 15, by - 5, 10, 20, COLORS.skin); drawRect(lx - 5, by - 10, 10, 20, COLORS.skin); drawRect(lx + 5, by - 8, 10, 18, COLORS.skin);
+    drawRect(rx - 20, by, 40, 40, COLORS.skin); drawRect(rx + 5, by - 5, 10, 20, COLORS.skin); drawRect(rx - 5, by - 10, 10, 20, COLORS.skin); drawRect(rx - 15, by - 8, 10, 18, COLORS.skin);
     if (gameState === STATE.START || gameState === STATE.CHARGING) {
-        const scale = 3;
-        drawPixelSprite(lx + 5, by, SHENGBEI_PIXELS.side, {1: COLORS.red}, scale, -Math.PI/2);
-        drawPixelSprite(rx - 5, by, SHENGBEI_PIXELS.side, {1: COLORS.red}, scale, Math.PI/2);
+        drawPixelSprite(lx + 5, by, SHENGBEI_PIXELS.side, {1: COLORS.red}, 3, -Math.PI/2);
+        drawPixelSprite(rx - 5, by, SHENGBEI_PIXELS.side, {1: COLORS.red}, 3, Math.PI/2);
     }
     ctx.restore();
 }
@@ -848,149 +866,76 @@ function drawPixelShengbei(cup) {
     let grid, colors;
     const scale = 3; 
     const rotation = cup.rot;
-    
     let showFlat = false;
+    if (cup.y >= FLOOR_Y && Math.abs(cup.vy) < 0.1) showFlat = cup.isFlat;
+    else showFlat = Math.cos(rotation) > 0;
 
-    // Determine current face
-    if (cup.y >= FLOOR_Y && Math.abs(cup.vy) < 0.1) {
-        showFlat = cup.isFlat;
-    } else {
-        const phase = Math.cos(rotation);
-        showFlat = phase > 0;
-    }
-    
-    // Choose Sprite
     if (Math.abs(Math.cos(rotation)) > 0.5) { 
-        if (showFlat) {
-            grid = SHENGBEI_PIXELS.flat;
-            colors = {1: COLORS.wood, 2: '#F4D090'}; 
-        } else {
-            grid = SHENGBEI_PIXELS.round;
-            colors = {1: COLORS.red, 2: '#FF5544'}; 
-        }
+        if (showFlat) { grid = SHENGBEI_PIXELS.flat; colors = {1: COLORS.wood, 2: '#F4D090'}; } 
+        else { grid = SHENGBEI_PIXELS.round; colors = {1: COLORS.red, 2: '#FF5544'}; }
     } else {
-        grid = SHENGBEI_PIXELS.side;
-        colors = {1: COLORS.red};
+        grid = SHENGBEI_PIXELS.side; colors = {1: COLORS.red};
     }
     drawPixelSprite(cup.x, cup.y, grid, colors, scale, rotation);
 
-    // --- Draw Text Only UI (No Icon) ---
     if (gameState === STATE.THROWN) {
-        ctx.save();
-        ctx.translate(cup.x, cup.y - 40); // Float above cup
-        
-        // Determine what the result would be NOW
+        ctx.save(); ctx.translate(cup.x, cup.y - 40); 
         const wouldBeFlat = Math.cos(rotation) > 0;
         let label = wouldBeFlat ? "平" : "凸";
-        
-        // Style the text
-        ctx.font = "bold 24px 'Ma Shan Zheng', sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        // Text Color matching the state
+        ctx.font = "bold 24px 'Ma Shan Zheng', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillStyle = wouldBeFlat ? COLORS.gold : COLORS.red;
-
-        // Stroke for visibility
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 4;
-        ctx.strokeText(label, 0, -10); 
-        ctx.fillText(label, 0, -10);
-        
+        ctx.strokeStyle = "black"; ctx.lineWidth = 4; ctx.strokeText(label, 0, -10); ctx.fillText(label, 0, -10);
         ctx.restore();
     }
 }
 
 function updateParticles() {
     for (let i = particles.length - 1; i >= 0; i--) {
-        let p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life--;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x, p.y, p.size, p.size);
+        let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life--;
+        ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size);
         if (p.life <= 0) particles.splice(i, 1);
     }
 }
 
 function createExplosion(x, y, color) {
     for(let i=0; i<15; i++) {
-        particles.push({
-            x: x * 2, 
-            y: y * 2,
-            vx: (Math.random() - 0.5) * 6,
-            vy: (Math.random() - 0.5) * 6,
-            life: 30,
-            color: color,
-            size: 6
-        });
+        particles.push({x: x * 2, y: y * 2, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 30, color: color, size: 6});
     }
 }
 
 // --- Game Logic ---
-
 function resetGame() {
-    gameState = STATE.START;
-    chargePower = 0;
-    statusText.innerText = "按住空格蓄力";
-    subText.style.display = "none"; 
-    statusText.style.color = "white";
-    wishInput.style.display = "block"; // Show input again
-    aiLayer.style.display = 'none';
-    resultType = "";
-    currentFortune = null;
+    gameState = STATE.START; chargePower = 0;
+    statusText.innerText = "按住空格蓄力"; subText.style.display = "none"; 
+    statusText.style.color = "white"; wishInput.style.display = "block"; wishInput.value = "";
+    aiLayer.style.display = 'none'; resultType = ""; currentFortune = null; blessingActive = false; // Reset blessing
     cups.left = { x: 80, y: FLOOR_Y, vx: 0, vy: 0, rot: 0, rotSpeed: 0, isFlat: false };
     cups.right = { x: 240, y: FLOOR_Y, vx: 0, vy: 0, rot: 0, rotSpeed: 0, isFlat: false };
 }
 
 function throwCups() {
-    gameState = STATE.THROWN;
-    subText.style.display = "block"; 
-    // Do not hide wish input immediately if user wants to see it, 
-    // or hide it to declutter. Let's hide it for cleaner view.
-    wishInput.style.display = "none"; 
-    
+    gameState = STATE.THROWN; subText.style.display = "block"; wishInput.style.display = "none"; 
     const power = 14 + (chargePower / 100) * 4; 
-    
-    cups.left.x = 80;
-    cups.left.y = 400; 
-    cups.left.vy = -power;
-    cups.left.vx = 0.5 + Math.random() * 1.5; 
-    cups.left.rotSpeed = 0.1 + Math.random() * 0.1;
-    
-    cups.right.x = 240;
-    cups.right.y = 400;
-    cups.right.vy = -power;
-    cups.right.vx = -(0.5 + Math.random() * 1.5);
-    cups.right.rotSpeed = -(0.1 + Math.random() * 0.1);
-    
+    cups.left.x = 80; cups.left.y = 400; cups.left.vy = -power; cups.left.vx = 0.5 + Math.random() * 1.5; cups.left.rotSpeed = 0.1 + Math.random() * 0.1;
+    cups.right.x = 240; cups.right.y = 400; cups.right.vy = -power; cups.right.vx = -(0.5 + Math.random() * 1.5); cups.right.rotSpeed = -(0.1 + Math.random() * 0.1);
     statusText.innerText = "空中按 ← → 翻转!";
+    // Check Wish Intent Asynchronously
+    checkWishIntent();
 }
 
 function checkResult() {
-    const leftFlat = cups.left.isFlat;
-    const rightFlat = cups.right.isFlat;
+    const leftFlat = cups.left.isFlat; const rightFlat = cups.right.isFlat;
     subText.style.display = "none";
-    
     setTimeout(() => {
-        gameState = STATE.RESULT;
-        aiLayer.style.display = 'flex'; 
-        
+        gameState = STATE.RESULT; aiLayer.style.display = 'flex'; 
         if (leftFlat !== rightFlat) {
-            resultType = "SHENGBEI";
-            statusText.innerText = "★ 胜杯！老爷保号 ★";
-            statusText.style.color = "#FFD700";
-            aiButton.innerText = "✨ 求支灵签 ✨";
-            createExplosion(GAME_WIDTH/2, 150, COLORS.gold);
+            resultType = "SHENGBEI"; statusText.innerText = "★ 胜杯！老爷保号 ★"; statusText.style.color = "#FFD700";
+            aiButton.innerText = "✨ 求支灵签 ✨"; createExplosion(GAME_WIDTH/2, 150, COLORS.gold);
         } else if (!leftFlat && !rightFlat) {
-            resultType = "WENBEI";
-            statusText.innerText = "稳杯 (两凸/阴)";
-            statusText.style.color = "#D93829";
+            resultType = "WENBEI"; statusText.innerText = "稳杯 (两凸/阴)"; statusText.style.color = "#D93829";
             aiButton.innerText = "⛰️ 询问老爷 ⛰️";
         } else {
-            resultType = "XIAOBEI";
-            statusText.innerText = "笑杯 (两平/阳)";
-            statusText.style.color = "#E5C087";
+            resultType = "XIAOBEI"; statusText.innerText = "笑杯 (两平/阳)"; statusText.style.color = "#E5C087";
             aiButton.innerText = "☁️ 老爷为何发笑? ☁️";
         }
     }, 500);
@@ -998,44 +943,34 @@ function checkResult() {
 
 function updatePhysics(dt) {
     if (gameState === STATE.THROWN || gameState === STATE.BOUNCING) {
-        
-        let physicsDt = dt; 
-
-        let settledCount = 0;
-        [cups.left, cups.right].forEach((cup) => {
-            // Apply Gravity
+        let physicsDt = dt; let settledCount = 0;
+        [cups.left, cups.right].forEach((cup, idx) => {
             if (cup.y < FLOOR_Y) cup.vy += GRAVITY * physicsDt;
-            
-            // Apply Velocity
-            cup.x += cup.vx * physicsDt;
-            cup.y += cup.vy * physicsDt;
-            cup.rot += cup.rotSpeed * physicsDt;
-            
-            // Walls
+            cup.x += cup.vx * physicsDt; cup.y += cup.vy * physicsDt; cup.rot += cup.rotSpeed * physicsDt;
             if (cup.x < 30 || cup.x > GAME_WIDTH - 30) cup.vx *= -0.5;
-            
-            // Floor Collision
             if (cup.y >= FLOOR_Y) {
                 cup.y = FLOOR_Y;
-                if (Math.abs(cup.vy) > 1.5) { 
-                    cup.vy *= -0.4; 
-                    // Exponential friction decay relative to time step
-                    cup.vx *= Math.pow(0.8, physicsDt); 
-                } else {
-                    cup.vy = 0;
-                    cup.vx = 0;
-                    cup.rotSpeed = 0;
-                    const phase = Math.cos(cup.rot);
-                    cup.isFlat = phase > 0; 
-                    cup.rot = cup.isFlat ? 0 : Math.PI; 
+                if (Math.abs(cup.vy) > 1.5) { cup.vy *= -0.4; cup.vx *= Math.pow(0.8, physicsDt); } 
+                else {
+                    // Settle Logic with Divine Intervention
+                    cup.vy = 0; cup.vx = 0; cup.rotSpeed = 0;
+                    
+                    // DIVINE BLESSING: Force specific outcome if active
+                    if (blessingActive) {
+                        // Left: Flat (0), Right: Round (PI) -> Shengbei
+                        if (idx === 0) { cup.rot = 0; cup.isFlat = true; } 
+                        else { cup.rot = Math.PI; cup.isFlat = false; }
+                    } else {
+                        // Normal Physics
+                        const phase = Math.cos(cup.rot);
+                        cup.isFlat = phase > 0; cup.rot = cup.isFlat ? 0 : Math.PI;
+                    }
                 }
             }
             if (cup.vy === 0 && cup.y === FLOOR_Y) settledCount++;
         });
-        
         if (settledCount === 2 && gameState !== STATE.BOUNCING && gameState !== STATE.RESULT) {
-            gameState = STATE.BOUNCING; 
-            checkResult();
+            gameState = STATE.BOUNCING; checkResult();
         }
     }
 }
@@ -1043,94 +978,48 @@ function updatePhysics(dt) {
 function flipCup(side) {
     if (gameState !== STATE.THROWN) return;
     const cup = side === 'left' ? cups.left : cups.right;
-    
-    cup.rotSpeed += (side === 'left' ? 0.3 : -0.3);
-    cup.rot += Math.PI / 2; 
-    cup.vy -= 2.5; 
-    
-    // Feedback effect
-    createExplosion(cup.x, cup.y, 'white'); 
+    cup.rotSpeed += (side === 'left' ? 0.3 : -0.3); cup.rot += Math.PI / 2; cup.vy -= 2.5; 
+    createExplosion(cup.x, cup.y, 'white');
 }
 
 function update(dt) {
     animTime += dt;
-
     if (gameState === STATE.START) {
-        if (keys.space) {
-            gameState = STATE.CHARGING;
-            chargePower = 0;
-        }
+        if (keys.space) { gameState = STATE.CHARGING; chargePower = 0; }
     } else if (gameState === STATE.CHARGING) {
-        if (keys.space) {
-            chargePower += chargeDir * 2 * dt;
-            if (chargePower > 100 || chargePower < 0) chargeDir *= -1;
-        } else {
-            throwCups();
-        }
+        if (keys.space) { chargePower += chargeDir * 2 * dt; if (chargePower > 100 || chargePower < 0) chargeDir *= -1; } 
+        else { throwCups(); }
     } else if (gameState === STATE.RESULT) {
-        if (keys.space && fortuneModal.style.display === 'none' && settingsModal.style.display === 'none') {
-            resetGame();
-            keys.space = false;
-        }
+        if (keys.space && fortuneModal.style.display === 'none' && settingsModal.style.display === 'none') { resetGame(); keys.space = false; }
     }
     updatePhysics(dt);
 }
 
 function draw() {
-    ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawLaoYe(); 
-    drawHands(); 
+    ctx.fillStyle = COLORS.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawLaoYe(); drawHands(); 
     if (gameState !== STATE.START && gameState !== STATE.CHARGING) {
-        ctx.save();
-        ctx.scale(2, 2);
-        ctx.fillStyle = COLORS.shadow;
+        ctx.save(); ctx.scale(2, 2); ctx.fillStyle = COLORS.shadow;
         [cups.left, cups.right].forEach(c => {
             const shadowScale = 1 - (FLOOR_Y - c.y)/300; 
-            if (shadowScale > 0) {
-                ctx.beginPath();
-                ctx.ellipse(c.x, FLOOR_Y + 12, 12 * shadowScale, 6 * shadowScale, 0, 0, Math.PI*2);
-                ctx.fill();
-            }
+            if (shadowScale > 0) { ctx.beginPath(); ctx.ellipse(c.x, FLOOR_Y + 12, 12 * shadowScale, 6 * shadowScale, 0, 0, Math.PI*2); ctx.fill(); }
         });
-        drawPixelShengbei(cups.left);
-        drawPixelShengbei(cups.right);
+        drawPixelShengbei(cups.left); drawPixelShengbei(cups.right);
         ctx.restore();
     }
     if (gameState === STATE.CHARGING) {
-        ctx.save();
-        ctx.scale(2, 2);
-        ctx.fillStyle = '#555';
-        ctx.fillRect(110, 350, 100, 10);
-        ctx.fillStyle = '#ff0';
-        ctx.fillRect(110, 350, chargePower, 10);
-        ctx.strokeStyle = '#fff';
-        ctx.strokeRect(110, 350, 100, 10);
-        ctx.restore();
+        ctx.save(); ctx.scale(2, 2); ctx.fillStyle = '#555'; ctx.fillRect(110, 350, 100, 10);
+        ctx.fillStyle = '#ff0'; ctx.fillRect(110, 350, chargePower, 10);
+        ctx.strokeStyle = '#fff'; ctx.strokeRect(110, 350, 100, 10); ctx.restore();
     }
     updateParticles(); 
 }
 
-window.addEventListener('keydown', e => {
-    if (e.code === 'Space') keys.space = true;
-    if (e.code === 'ArrowLeft') { keys.left = true; flipCup('left'); }
-    if (e.code === 'ArrowRight') { keys.right = true; flipCup('right'); }
-});
-window.addEventListener('keyup', e => {
-    if (e.code === 'Space') keys.space = false;
-    if (e.code === 'ArrowLeft') keys.left = false;
-    if (e.code === 'ArrowRight') keys.right = false;
-});
+window.addEventListener('keydown', e => { if (e.code === 'Space') keys.space = true; if (e.code === 'ArrowLeft') { keys.left = true; flipCup('left'); } if (e.code === 'ArrowRight') { keys.right = true; flipCup('right'); } });
+window.addEventListener('keyup', e => { if (e.code === 'Space') keys.space = false; });
 const handleTouch = (keyName, isDown) => {
-    if (keyName === 'space') {
-        keys.space = isDown;
-        if(isDown && gameState === STATE.RESULT && fortuneModal.style.display === 'none' && settingsModal.style.display === 'none') {
-            resetGame();
-            keys.space = false;
-        }
-    }
-    if (keyName === 'left' && isDown) flipCup('left');
-    if (keyName === 'right' && isDown) flipCup('right');
+    if (keyName === 'space') { keys.space = isDown; if(isDown && gameState === STATE.RESULT && fortuneModal.style.display === 'none' && settingsModal.style.display === 'none') { resetGame(); keys.space = false; } }
+    if (keyName === 'left' && isDown) flipCup('left'); if (keyName === 'right' && isDown) flipCup('right');
 };
 if ('ontouchstart' in window) document.getElementById('mobile-controls').style.display = 'flex';
 document.getElementById('btn-space').addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch('space', true); });
