@@ -275,7 +275,7 @@
             background-size: 20px 20px;
             width: 100%;
             max-width: 280px;
-            padding: 0; /* Remove default padding, use flex for layout */
+            padding: 0;
             border: 8px double #D93829;
             box-shadow: 0 0 30px rgba(217, 56, 41, 0.3);
             text-align: center;
@@ -335,7 +335,7 @@
             justify-content: center;
             gap: 10px;
             padding: 15px 20px;
-            background: rgba(255, 240, 245, 0.9); /* Match paper color */
+            background: rgba(255, 240, 245, 0.9);
             border-top: 1px solid rgba(217, 56, 41, 0.3);
         }
 
@@ -344,7 +344,7 @@
             border: none;
             padding: 12px 15px;
             cursor: pointer;
-            font-family: 'Ma Shan Zheng', cursive; /* Match theme */
+            font-family: 'Ma Shan Zheng', cursive;
             border-radius: 50px;
             font-size: 16px;
             flex: 1;
@@ -471,16 +471,16 @@
 
 <script>
 /**
- * 掷圣杯：老爷保号 - Final Release
+ * 掷圣杯：老爷保号 - Ultimate Release (Dynamic Personas + Deep Reasoning)
  */
 
 // ==========================================================
 // 【配置区域】请在下方填入您的 API Key (已Base64编码保护)
+// 默认配置为 DeepSeek (sk-90bf60a9f9424f79bf3350983e008fcf)
 const DEFAULT_CONFIG = {
-    // 默认使用 DeepSeek (国内最稳)
     apiUrl: "https://api.deepseek.com/chat/completions",
     model: "deepseek-chat",
-    // 您的 Key (Base64 Encoded): sk-90bf60a9f9424f79bf3350983e008fcf
+    // Base64 Encoded Key to prevent casual scraping
     key_enc: "c2stOTBiZjYwYTlmOTQyNGY3OWJmMzM1MDk4M2UwMDhmY2Y="
 };
 // ==========================================================
@@ -505,9 +505,49 @@ const apiKeyInput = document.getElementById('api-key-input');
 const keyStatusDisplay = document.getElementById('key-status-display');
 const btnAccept = document.getElementById('btn-accept');
 
+// --- Dynamic Personas ---
+const PERSONAS = [
+    {
+        id: "kind", // 慈悲相
+        weight: 0.6,
+        system: `你即是潮汕地区的守护神“老爷”。
+人设：慈祥温暖，像家里的老祖父，非常护短，心疼信徒。
+语言风格：半文半白，夹杂潮汕方言特色。
+口头禅：称用户为“弟子”，常用“勿慌”、“食茶”、“顺顺”、“老爷保号”。
+任务：深度结合签文典故与用户心愿，给出温暖的指引和安慰。`
+    },
+    {
+        id: "strict", // 威严相
+        weight: 0.2,
+        system: `你即是潮汕地区的守护神“老爷”。
+人设：威严正直，铁面无私，洞察人心，不怒自威。
+语言风格：简练有力，古风浓重，不苟言笑。
+口头禅：称用户为“信女/善男”，常用“慎之”、“天道酬勤”、“切记”。
+任务：一针见血地指出签文中的警示，告诫用户要修身养德，不可妄求。`
+    },
+    {
+        id: "witty", // 通透相
+        weight: 0.2,
+        system: `你即是潮汕地区的守护神“老爷”。
+人设：看透世俗的老顽童，风趣幽默，甚至是有点“皮”。
+语言风格：轻松自在，带有禅意，偶尔会反问或吐槽。
+口头禅：常用“有趣”、“有影无？”(真的吗)、“且去”、“莫强求”。
+任务：用幽默或打机锋的方式化解用户的执念，告诉他们人生除生死无大事。`
+    }
+];
+
+function getRandomPersona() {
+    const rand = Math.random();
+    let cumulative = 0;
+    for (const p of PERSONAS) {
+        cumulative += p.weight;
+        if (rand < cumulative) return p;
+    }
+    return PERSONAS[0];
+}
+
 // --- Key Management Logic ---
 let customApiKey = localStorage.getItem('shengbei_api_key') || "";
-
 updateKeyStatus(!!customApiKey);
 
 function updateKeyStatus(hasCustom) {
@@ -526,15 +566,8 @@ function updateKeyStatus(hasCustom) {
 }
 
 function getEffectiveKey() {
-    if (customApiKey && customApiKey.trim().length > 0) {
-        return customApiKey;
-    }
-    try {
-        return atob(DEFAULT_CONFIG.key_enc);
-    } catch (e) {
-        console.error("Key decoding failed");
-        return "";
-    }
+    if (customApiKey && customApiKey.trim().length > 0) return customApiKey;
+    try { return atob(DEFAULT_CONFIG.key_enc); } catch (e) { return ""; }
 }
 
 function showSettings() {
@@ -566,41 +599,20 @@ function clearSettings() {
     updateKeyStatus(false);
 }
 
-settingsBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    showSettings();
-});
-
-// Prevent spacebar from triggering throw when typing wish
-wishInput.addEventListener('keydown', (e) => {
-    e.stopPropagation();
-});
+settingsBtn.addEventListener('click', (e) => { e.stopPropagation(); showSettings(); });
+wishInput.addEventListener('keydown', (e) => { e.stopPropagation(); });
 
 // Handle High DPI
 const GAME_WIDTH = 320;
 const GAME_HEIGHT = 480;
-
 canvas.width = GAME_WIDTH * 2;
 canvas.height = GAME_HEIGHT * 2;
 
-const STATE = {
-    START: 0,
-    CHARGING: 1,
-    THROWN: 2,
-    BOUNCING: 3,
-    RESULT: 4
-};
-
+const STATE = { START: 0, CHARGING: 1, THROWN: 2, BOUNCING: 3, RESULT: 4 };
 const COLORS = {
-    bg: '#2C1E18',
-    gold: '#FFD700',
-    red: '#D93829', 
-    wood: '#E5C087',
-    skin: '#E8B796',
-    altar: '#8B4513',
-    shadow: 'rgba(0,0,0,0.5)',
-    auraGold: 'rgba(255, 215, 0, 0.4)', 
-    auraRed: 'rgba(217, 56, 41, 0.4)'
+    bg: '#2C1E18', gold: '#FFD700', red: '#D93829', wood: '#E5C087',
+    skin: '#E8B796', altar: '#8B4513', shadow: 'rgba(0,0,0,0.5)',
+    auraGold: 'rgba(255, 215, 0, 0.4)', auraRed: 'rgba(217, 56, 41, 0.4)'
 };
 
 let gameState = STATE.START;
@@ -608,7 +620,6 @@ let animTime = 0;
 let chargePower = 0;
 let chargeDir = 1;
 let resultType = ""; 
-// New Flag for Divine Intervention
 let blessingActive = false; 
 
 const GRAVITY = 0.15; 
@@ -625,7 +636,6 @@ let currentFortune = null;
 
 // --- EXPANDED FORTUNES DATABASE (No bad luck) ---
 const FORTUNES = [
-    // 上上 / 大吉 (General)
     { title: "第一签 上上", poem: "彩凤呈祥瑞气多，\n身荣富贵乐如何。\n腰金衣紫人钦敬，\n一世荣华不蹉跎。" },
     { title: "第二签 大吉", poem: "鲲鹏万里任飞扬，\n好景良辰在异乡。\n不但功名能显达，\n荣华富贵寿而康。" },
     { title: "第三签 上上", poem: "枯木逢春色更鲜，\n主公欢喜地生连。\n如今喜得天赐福，\n祸去灾消福禄全。" },
@@ -634,19 +644,13 @@ const FORTUNES = [
     { title: "第六签 大吉", poem: "登山涉水正天台，\n少小姻缘逐渐来。\n此去行人得利便，\n贵人接引笑颜开。" },
     { title: "第七签 上吉", poem: "梅花冻雪绽芳菲，\n一夜春风逐暖归。\n君子求谋皆遂意，\n贵人相助显光辉。" },
     { title: "第八签 上上", poem: "平生作善感苍天，\n福寿绵长胜昔贤。\n今日得逢真造化，\n荣华富贵万万年。" },
-    
-    // 中吉 / 上吉 (Career/Study)
     { title: "第九签 中吉", poem: "舟行滩上忽遇风，\n费尽工夫暂未通。\n只有贵人轻助力，\n依然依旧挂帆蓬。" },
     { title: "第十签 上吉", poem: "十年窗下苦功深，\n一旦成名四海钦。\n显祖荣宗人敬重，\n不须更去问知音。" },
     { title: "第十一签 中吉", poem: "经营作事要心坚，\n费力劳心恐未全。\n若得贵人轻指引，\n依然平地也就是天。" },
     { title: "第十二签 上吉", poem: "青云有路志登天，\n金榜题名在目前。\n稳步蟾宫折桂去，\n光宗耀祖好流传。" },
-
-    // 中平 (Steady/Patience)
     { title: "第十三签 中平", poem: "行船把舵要在中，\n不须使力与使功。\n潮水来时风又顺，\n自然载得宝归篷。" },
     { title: "第十四签 中平", poem: "一点丹心以此为，\n长江风浪不须推。\n目前只管勤耕作，\n日后荣华自然回。" },
     { title: "第十五签 中平", poem: "平地行舟水浪多，\n必须仔细把船拖。\n若能把舵心安稳，\n不怕风波奈我何。" },
-    
-    // Health/Peace/Family (Best for Divine Blessing)
     { title: "第十六签 上吉", poem: "福如东海寿如山，\n君尔何须叹苦难。\n命内自然逢大吉，\n祈求神圣保平安。" },
     { title: "第十七签 大吉", poem: "春来花发映阳台，\n万里车书尽带来。\n好景良辰君可见，\n门庭喜气自天来。" },
     { title: "第十八签 上上", poem: "金乌西坠兔东升，\n日夜循环暂不停。\n僧道得之无不利，\n工商农士各称心。" },
@@ -665,44 +669,23 @@ const FORTUNES = [
 ];
 
 const XIAOBEI_MSGS = [
-    "心中有数，何必问我？",
-    "笑而不语，机缘未到。",
-    "弟子，此事不必再问。",
-    "莫强求，顺其自然。",
-    "此卦为笑，意在言外。",
-    "你其实已经知道答案了。",
-    "问题太模糊，老爷听不懂。",
-    "且放宽心，一笑置之。",
-    "老爷正在吃茶，稍后再问。",
-    "问题太可爱，老爷笑了。",
-    "心诚则灵，勿执着于签。",
-    "此事天机，不可说破。"
+    "心中有数，何必问我？", "笑而不语，机缘未到。", "弟子，此事不必再问。", "莫强求，顺其自然。",
+    "此卦为笑，意在言外。", "你其实已经知道答案了。", "问题太模糊，老爷听不懂。", "且放宽心，一笑置之。",
+    "老爷正在吃茶，稍后再问。", "问题太可爱，老爷笑了。", "心诚则灵，勿执着于签。", "此事天机，不可说破。"
 ];
 
 const WENBEI_MSGS = [
-    "时运未至，切勿妄动。",
-    "心诚则灵，杂念太重。",
-    "此路不通，另寻他法。",
-    "天机不可泄露。",
-    "暂守本分，勿生贪念。",
-    "老爷在忙，改日再来。",
-    "此事不可为，慎之。",
-    "静心修德，福报自来。",
-    "欲速则不达，且慢行。",
-    "静观其变，不宜躁进。",
-    "心中有碍，先去心魔。",
-    "莫信直中直，须防仁不仁。"
+    "时运未至，切勿妄动。", "心诚则灵，杂念太重。", "此路不通，另寻他法。", "天机不可泄露。",
+    "暂守本分，勿生贪念。", "老爷在忙，改日再来。", "此事不可为，慎之。", "静心修德，福报自来。",
+    "欲速则不达，且慢行。", "静观其变，不宜躁进。", "心中有碍，先去心魔。", "莫信直中直，须防仁不仁。"
 ];
 
-/**
- * 1. Intent Analysis: Check if wish is about health/family immediately after throwing
- */
+// --- 1. Intent Analysis ---
 async function checkWishIntent() {
     const wish = wishInput.value.trim();
-    if (!wish) return; // No wish, no blessing
-    
+    if (!wish) return; 
     const key = getEffectiveKey();
-    if (!key) return; // No key, no AI blessing
+    if (!key) return; 
 
     try {
         const response = await fetch(DEFAULT_CONFIG.apiUrl, {
@@ -730,9 +713,7 @@ async function checkWishIntent() {
     }
 }
 
-/**
- * 2. Result Interpretation (AI)
- */
+// --- 2. Result Interpretation (AI with Personas) ---
 async function callAI(type) {
     const effectiveKey = getEffectiveKey();
     if (!effectiveKey) { showSettings(); return; }
@@ -741,19 +722,23 @@ async function callAI(type) {
     loadingView.style.display = 'flex';
     resultView.style.display = 'none';
     
-    const loadingTexts = ["老爷正在查阅天书...", "香烟袅袅，沟通天庭...", "老爷正在斟酌...", "圣杯落地，神机显现..."];
+    const loadingTexts = ["老爷正在查阅天书...", "香烟袅袅，沟通天庭...", "正在聆听弟子心声...", "圣杯落地，神机显现..."];
     loadingText.innerText = loadingTexts[Math.floor(Math.random() * loadingTexts.length)];
 
     const userWish = wishInput.value.trim();
-    let wishContext = userWish ? ` The believer has a wish: "${userWish}". Interpret result in this context.` : "";
+    let wishContext = userWish 
+        ? `信徒心中所求之事为：“${userWish}”。请务必结合此事进行具体解读，不要泛泛而谈。` 
+        : "信徒心中无具体所指，求整体运势。";
 
-    let systemPrompt = "You are 'Lao Ye' (老爷), a wise, kind Chaoshan deity. Speak in Chinese. Be protective & warm. Keep responses under 60 words. No meta info.";
+    // Select Persona
+    let selectedPersona = getRandomPersona();
+    if (type === "XIAOBEI" && Math.random() > 0.5) selectedPersona = PERSONAS.find(p => p.id === "witty");
+    if (blessingActive) selectedPersona = PERSONAS.find(p => p.id === "kind");
+
+    let systemPrompt = selectedPersona.system + "\n\n约束：\n1. 回复限制在 80 字以内。\n2. 严禁出现‘作为AI’等字眼。\n3. 必须包含潮汕/古风特色词汇。\n4. 若是上签，多给鼓励；若是笑杯/稳杯，多给哲理指引。";
     let userPrompt = "";
     
-    // Update Button Text Logic
     if (type === "SHENGBEI") {
-        btnAccept.innerText = "收下签文";
-        // Divine Logic
         if (blessingActive) {
             const bestFortunes = FORTUNES.filter(f => f.title.includes("上上") || f.title.includes("大吉"));
             currentFortune = bestFortunes[Math.floor(Math.random() * bestFortunes.length)];
@@ -764,19 +749,20 @@ async function callAI(type) {
         
         fortuneTitle.innerText = "✨ " + currentFortune.title + " ✨";
         fortuneText.innerText = currentFortune.poem;
-        userPrompt = `A believer drew fortune: "${currentFortune.title}" with poem: "${currentFortune.poem.replace(/\n/g, ', ')}".${wishContext} Provide a brief interpretation.`;
+        btnAccept.innerText = "收下签文";
+        userPrompt = `信徒掷出了【胜杯】(圣意许可)。抽到的签文是：“${currentFortune.title} - ${currentFortune.poem.replace(/\n/g, ', ')}”。${wishContext} 请按照您的人设进行解读。先解释签文寓意，再针对心愿给出指引，最后送上祝福。`;
     } else if (type === "XIAOBEI") {
-        btnAccept.innerText = "谨遵神示";
         const msg = XIAOBEI_MSGS[Math.floor(Math.random() * XIAOBEI_MSGS.length)];
         fortuneTitle.innerText = "☁️ 老爷笑了 ☁️";
         fortuneText.innerText = msg;
-        userPrompt = `Believer threw 'Xiaobei'. You said: "${msg}".${wishContext} Explain why laughing kindly.`;
-    } else {
         btnAccept.innerText = "谨遵神示";
+        userPrompt = `信徒掷出了【笑杯】(神明发笑/未置可否)。您给出的随机神谕是：“${msg}”。${wishContext} 请用您的人设解释为何发笑？是不是信徒的问题太天真，或者答案显而易见？请幽默或温暖地化解信徒的疑惑。`;
+    } else {
         const msg = WENBEI_MSGS[Math.floor(Math.random() * WENBEI_MSGS.length)];
         fortuneTitle.innerText = "⛰️ 老爷不语 ⛰️";
         fortuneText.innerText = msg;
-        userPrompt = `Believer threw 'Wenbei'. You said: "${msg}".${wishContext} Explain why refused sternly.`;
+        btnAccept.innerText = "谨遵神示";
+        userPrompt = `信徒掷出了【稳杯】(神明拒绝/时机未到)。您给出的随机神谕是：“${msg}”。${wishContext} 请用您的人设严肃地告知信徒为何不应此时强求？是不是心不诚，或者时机未到？请给出富有哲理的劝诫。`;
     }
 
     try {
@@ -785,14 +771,15 @@ async function callAI(type) {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${effectiveKey}` },
             body: JSON.stringify({ 
                 model: DEFAULT_CONFIG.model,
-                messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }]
+                messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+                stream: false, temperature: 0.8
             })
         });
         const data = await response.json();
         const text = data.choices[0].message.content;
         
         loadingView.style.display = 'none';
-        resultView.style.display = 'flex'; // Changed to flex for proper layout
+        resultView.style.display = 'flex';
         fortuneAiComment.innerText = "【老爷神示】\n" + text;
         fortuneAiComment.style.display = 'block';
     } catch (error) {
@@ -814,7 +801,6 @@ function closeFortuneModal() {
     fortuneModal.style.display = 'none';
 }
 
-// 🆕 New Function: Restart with fresh wish
 function restartWithNewWish() {
     closeFortuneModal();
     resetGame();
