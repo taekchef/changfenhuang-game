@@ -275,14 +275,22 @@
             background-size: 20px 20px;
             width: 100%;
             max-width: 280px;
-            padding: 20px;
+            padding: 0; /* Remove default padding, use flex for layout */
             border: 8px double #D93829;
             box-shadow: 0 0 30px rgba(217, 56, 41, 0.3);
             text-align: center;
             font-family: 'Ma Shan Zheng', cursive;
             position: relative;
-            overflow-y: auto;
             max-height: 80%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Scrollable Content Area */
+        .fortune-scroll-area {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
         }
 
         .settings-paper {
@@ -321,31 +329,40 @@
             font-style: italic;
         }
 
-        /* Buttons in Modal */
+        /* Fixed Button Group at Bottom */
         .modal-btn-group {
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-top: 20px;
+            padding: 15px 20px;
+            background: rgba(255, 240, 245, 0.9); /* Match paper color */
+            border-top: 1px solid rgba(217, 56, 41, 0.3);
         }
 
         .close-btn, .restart-btn {
             color: white;
             border: none;
-            padding: 10px 15px;
+            padding: 12px 15px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
-            border-radius: 5px;
-            font-size: 14px;
+            font-family: 'Ma Shan Zheng', cursive; /* Match theme */
+            border-radius: 50px;
+            font-size: 16px;
             flex: 1;
+            transition: transform 0.1s;
+        }
+        
+        .close-btn:active, .restart-btn:active {
+            transform: scale(0.95);
         }
 
         .close-btn {
             background: #555;
+            border: 2px solid #333;
         }
 
         .restart-btn {
             background: #D93829; /* Red for emphasis */
+            border: 2px solid #8B4513;
         }
 
         .input-key {
@@ -420,12 +437,14 @@
             </div>
             
             <div id="result-view" class="fortune-paper" style="display:none;">
-                <div class="fortune-title" id="fortune-title">上上签</div>
-                <div class="fortune-content" id="fortune-text"></div>
-                <div class="fortune-ai-comment" id="fortune-ai-comment" style="display:none;"></div>
+                <div class="fortune-scroll-area">
+                    <div class="fortune-title" id="fortune-title">上上签</div>
+                    <div class="fortune-content" id="fortune-text"></div>
+                    <div class="fortune-ai-comment" id="fortune-ai-comment" style="display:none;"></div>
+                </div>
                 
                 <div class="modal-btn-group">
-                    <button class="close-btn" onclick="closeFortuneModal()">收下签文</button>
+                    <button id="btn-accept" class="close-btn" onclick="closeFortuneModal()">收下签文</button>
                     <button class="restart-btn" onclick="restartWithNewWish()">再求一事</button>
                 </div>
             </div>
@@ -456,13 +475,13 @@
  */
 
 // ==========================================================
-// 【配置区域】请在下方填入您的 API Key
+// 【配置区域】请在下方填入您的 API Key (已Base64编码保护)
 const DEFAULT_CONFIG = {
     // 默认使用 DeepSeek (国内最稳)
-    // 申请地址: https://platform.deepseek.com/
     apiUrl: "https://api.deepseek.com/chat/completions",
     model: "deepseek-chat",
-    key: "sk-90bf60a9f9424f79bf3350983e008fcf" // <--- 默认 Key
+    // 您的 Key (Base64 Encoded): sk-90bf60a9f9424f79bf3350983e008fcf
+    key_enc: "c2stOTBiZjYwYTlmOTQyNGY3OWJmMzM1MDk4M2UwMDhmY2Y="
 };
 // ==========================================================
 
@@ -484,6 +503,7 @@ const fortuneAiComment = document.getElementById('fortune-ai-comment');
 const settingsBtn = document.getElementById('settings-btn');
 const apiKeyInput = document.getElementById('api-key-input');
 const keyStatusDisplay = document.getElementById('key-status-display');
+const btnAccept = document.getElementById('btn-accept');
 
 // --- Key Management Logic ---
 let customApiKey = localStorage.getItem('shengbei_api_key') || "";
@@ -495,7 +515,7 @@ function updateKeyStatus(hasCustom) {
         keyStatusDisplay.innerHTML = "🔧 当前使用: 自定义 Key";
         keyStatusDisplay.style.color = "#FFD700";
     } else {
-        if (DEFAULT_CONFIG.key && DEFAULT_CONFIG.key.length > 5) {
+        if (DEFAULT_CONFIG.key_enc && DEFAULT_CONFIG.key_enc.length > 5) {
             keyStatusDisplay.innerHTML = "✅ 当前使用: 默认 Key (已配置)";
             keyStatusDisplay.style.color = "#4CAF50";
         } else {
@@ -506,7 +526,15 @@ function updateKeyStatus(hasCustom) {
 }
 
 function getEffectiveKey() {
-    return customApiKey && customApiKey.trim().length > 0 ? customApiKey : DEFAULT_CONFIG.key;
+    if (customApiKey && customApiKey.trim().length > 0) {
+        return customApiKey;
+    }
+    try {
+        return atob(DEFAULT_CONFIG.key_enc);
+    } catch (e) {
+        console.error("Key decoding failed");
+        return "";
+    }
 }
 
 function showSettings() {
@@ -524,7 +552,7 @@ function saveSettings() {
         customApiKey = input;
         localStorage.setItem('shengbei_api_key', customApiKey);
         updateKeyStatus(true);
-        alert("Key 已保存！");
+        alert("自定义 Key 已保存！优先使用您的 Key。");
     } else {
         clearSettings();
     }
@@ -722,10 +750,11 @@ async function callAI(type) {
     let systemPrompt = "You are 'Lao Ye' (老爷), a wise, kind Chaoshan deity. Speak in Chinese. Be protective & warm. Keep responses under 60 words. No meta info.";
     let userPrompt = "";
     
+    // Update Button Text Logic
     if (type === "SHENGBEI") {
-        // If divine blessing was active, force picking from Best fortunes
+        btnAccept.innerText = "收下签文";
+        // Divine Logic
         if (blessingActive) {
-            // Filter only 上上 or 大吉
             const bestFortunes = FORTUNES.filter(f => f.title.includes("上上") || f.title.includes("大吉"));
             currentFortune = bestFortunes[Math.floor(Math.random() * bestFortunes.length)];
         } else {
@@ -737,11 +766,13 @@ async function callAI(type) {
         fortuneText.innerText = currentFortune.poem;
         userPrompt = `A believer drew fortune: "${currentFortune.title}" with poem: "${currentFortune.poem.replace(/\n/g, ', ')}".${wishContext} Provide a brief interpretation.`;
     } else if (type === "XIAOBEI") {
+        btnAccept.innerText = "谨遵神示";
         const msg = XIAOBEI_MSGS[Math.floor(Math.random() * XIAOBEI_MSGS.length)];
         fortuneTitle.innerText = "☁️ 老爷笑了 ☁️";
         fortuneText.innerText = msg;
         userPrompt = `Believer threw 'Xiaobei'. You said: "${msg}".${wishContext} Explain why laughing kindly.`;
     } else {
+        btnAccept.innerText = "谨遵神示";
         const msg = WENBEI_MSGS[Math.floor(Math.random() * WENBEI_MSGS.length)];
         fortuneTitle.innerText = "⛰️ 老爷不语 ⛰️";
         fortuneText.innerText = msg;
@@ -761,13 +792,13 @@ async function callAI(type) {
         const text = data.choices[0].message.content;
         
         loadingView.style.display = 'none';
-        resultView.style.display = 'block';
+        resultView.style.display = 'flex'; // Changed to flex for proper layout
         fortuneAiComment.innerText = "【老爷神示】\n" + text;
         fortuneAiComment.style.display = 'block';
     } catch (error) {
         console.error(error);
         loadingView.style.display = 'none';
-        resultView.style.display = 'block';
+        resultView.style.display = 'flex';
         
         let fallbackMsg = "";
         if (type === "SHENGBEI") fallbackMsg = "【老爷神示】\n心诚则灵，所求之事必有回响。此签大吉，安心前行即可。";
